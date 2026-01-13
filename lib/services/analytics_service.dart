@@ -94,8 +94,7 @@ class AnalyticsService {
       habitId: habitId,
       current: current,
       longest: longest,
-      lastCompletionDate:
-          sorted.isNotEmpty ? sorted.first.date : null,
+      lastCompletionDate: sorted.isNotEmpty ? sorted.first.date : null,
     );
   }
 

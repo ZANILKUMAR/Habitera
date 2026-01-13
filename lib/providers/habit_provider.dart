@@ -21,7 +21,7 @@ final dailyStatsProvider = FutureProvider((ref) async {
   final db = ref.watch(databaseProvider);
   final habits = await db.getAllHabits();
   final completions = await db.getCompletionsForDate(DateTime.now());
-  
+
   final total = habits.length;
   final completed = completions.length;
   final percentage = total > 0 ? (completed / total) * 100 : 0;
@@ -41,7 +41,7 @@ final heatmapProvider = FutureProvider<Map<String, int>>((ref) async {
 final streaksProvider = FutureProvider.family((ref, String habitId) async {
   final db = ref.watch(databaseProvider);
   final completions = await db.getCompletionsForHabit(habitId);
-  
+
   final sorted = List.from(completions);
   sorted.sort((a, b) => b.date.compareTo(a.date));
 
@@ -57,6 +57,7 @@ final streaksProvider = FutureProvider.family((ref, String habitId) async {
       sorted.first.date.day,
     );
 
+    // Calculate current streak
     if ((lastCompletionDate.year == today.year &&
             lastCompletionDate.month == today.month &&
             lastCompletionDate.day == today.day) ||
@@ -84,6 +85,35 @@ final streaksProvider = FutureProvider.family((ref, String habitId) async {
           break;
         }
       }
+    }
+    
+    // Calculate longest streak
+    int tempStreak = 1;
+    for (int i = 1; i < sorted.length; i++) {
+      final prevDate = DateTime(
+        sorted[i].date.year,
+        sorted[i].date.month,
+        sorted[i].date.day,
+      );
+      final currentDate = DateTime(
+        sorted[i - 1].date.year,
+        sorted[i - 1].date.month,
+        sorted[i - 1].date.day,
+      );
+
+      final diff = currentDate.difference(prevDate).inDays;
+      if (diff == 1) {
+        tempStreak++;
+      } else {
+        if (tempStreak > longest) {
+          longest = tempStreak;
+        }
+        tempStreak = 1;
+      }
+    }
+    // Check the last streak
+    if (tempStreak > longest) {
+      longest = tempStreak;
     }
   }
 
