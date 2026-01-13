@@ -12,6 +12,7 @@
         "flutter_animate",
         "flutter_local_notifications",
         "flutter_riverpod",
+        "flutter_timezone",
         "google_fonts",
         "intl",
         "json_annotation",
@@ -169,6 +170,14 @@
         "url_launcher_web",
         "url_launcher_windows",
         "win32"
+      ]
+    },
+    {
+      "name": "flutter_timezone",
+      "version": "3.0.1",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins"
       ]
     },
     {
