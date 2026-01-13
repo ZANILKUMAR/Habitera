@@ -36,6 +36,7 @@ class NotificationService {
   }
 
   Future<void> requestPermissions() async {
+    // Request iOS permissions
     await _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin>()
@@ -44,6 +45,16 @@ class NotificationService {
           badge: true,
           sound: true,
         );
+    
+    // Request Android 13+ notification permission
+    final androidImplementation = _flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+      await androidImplementation.requestExactAlarmsPermission();
+    }
   }
 
   Future<void> scheduleReminder(Habit habit) async {

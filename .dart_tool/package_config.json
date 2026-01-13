@@ -224,6 +224,12 @@
       "languageVersion": "3.8"
     },
     {
+      "name": "flutter_timezone",
+      "rootUri": "file:///C:/Users/anilkumar/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_timezone-3.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "flutter_web_plugins",
       "rootUri": "file:///C:/flutter/packages/flutter_web_plugins",
       "packageUri": "lib/",
