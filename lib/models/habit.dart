@@ -79,12 +79,14 @@ class Completion {
   final String habitId;
   final DateTime date;
   final DateTime completedAt;
+  final String? notes;
 
   Completion({
     required this.id,
     required this.habitId,
     required this.date,
     required this.completedAt,
+    this.notes,
   });
 
   factory Completion.fromJson(Map<String, dynamic> json) =>

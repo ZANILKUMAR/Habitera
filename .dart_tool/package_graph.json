@@ -7,6 +7,7 @@
       "name": "habitera",
       "version": "1.0.0+1",
       "dependencies": [
+        "file_picker",
         "flutter",
         "flutter_animate",
         "flutter_local_notifications",
@@ -137,6 +138,21 @@
       ]
     },
     {
+      "name": "file_picker",
+      "version": "8.3.7",
+      "dependencies": [
+        "cross_file",
+        "ffi",
+        "flutter",
+        "flutter_plugin_android_lifecycle",
+        "flutter_web_plugins",
+        "path",
+        "plugin_platform_interface",
+        "web",
+        "win32"
+      ]
+    },
+    {
       "name": "share_plus",
       "version": "7.2.2",
       "dependencies": [
@@ -164,7 +180,7 @@
     },
     {
       "name": "flutter_local_notifications",
-      "version": "15.1.3",
+      "version": "18.0.1",
       "dependencies": [
         "clock",
         "flutter",
@@ -649,6 +665,19 @@
       "dependencies": []
     },
     {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "cross_file",
+      "version": "0.3.5+1",
+      "dependencies": [
+        "meta",
+        "web"
+      ]
+    },
+    {
       "name": "win32",
       "version": "5.15.0",
       "dependencies": [
@@ -659,6 +688,27 @@
       "name": "ffi",
       "version": "2.1.5",
       "dependencies": []
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "flutter_plugin_android_lifecycle",
+      "version": "2.0.33",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
     },
     {
       "name": "url_launcher_platform_interface",
@@ -716,23 +766,8 @@
       ]
     },
     {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
-      "name": "cross_file",
-      "version": "0.3.5+1",
-      "dependencies": [
-        "meta",
-        "web"
-      ]
-    },
-    {
       "name": "flutter_local_notifications_platform_interface",
-      "version": "7.2.0",
+      "version": "8.0.0",
       "dependencies": [
         "flutter",
         "plugin_platform_interface"
@@ -740,7 +775,7 @@
     },
     {
       "name": "flutter_local_notifications_linux",
-      "version": "4.0.1",
+      "version": "5.0.0",
       "dependencies": [
         "dbus",
         "ffi",
@@ -846,11 +881,6 @@
     {
       "name": "synchronized",
       "version": "3.4.0",
-      "dependencies": []
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
       "dependencies": []
     },
     {
@@ -1035,13 +1065,6 @@
       "dependencies": [
         "source_span",
         "string_scanner"
-      ]
-    },
-    {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
-      "dependencies": [
-        "meta"
       ]
     },
     {

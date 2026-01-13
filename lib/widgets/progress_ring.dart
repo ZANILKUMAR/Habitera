@@ -55,8 +55,8 @@ class ProgressRing extends StatelessWidget {
                   Text(
                     label!,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontSize: size * 0.1,
-                    ),
+                          fontSize: size * 0.1,
+                        ),
                   ),
               ],
             ),

@@ -5,7 +5,7 @@ class AppSettings {
   final String appVersion;
 
   AppSettings({
-    this.theme = 'system',
+    this.theme = 'dark',
     this.notificationsEnabled = true,
     this.lastBackup,
     this.appVersion = '1.0.0',
@@ -36,11 +36,10 @@ class AppSettings {
 
   static AppSettings fromMap(Map<String, dynamic> map) {
     return AppSettings(
-      theme: map['theme'] ?? 'system',
+      theme: map['theme'] ?? 'dark',
       notificationsEnabled: (map['notificationsEnabled'] ?? 1) == 1,
-      lastBackup: map['lastBackup'] != null
-          ? DateTime.parse(map['lastBackup'])
-          : null,
+      lastBackup:
+          map['lastBackup'] != null ? DateTime.parse(map['lastBackup']) : null,
       appVersion: map['appVersion'] ?? '1.0.0',
     );
   }

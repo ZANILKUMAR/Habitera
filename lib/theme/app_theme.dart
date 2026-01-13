@@ -47,7 +47,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         surface: AppColors.neutral50,
         onSurface: AppColors.neutral900,
         primary: AppColors.neutral900,
@@ -55,12 +55,12 @@ class AppTheme {
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.neutral0,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.neutral0,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           color: AppColors.neutral900,
           fontSize: 28,
           fontWeight: FontWeight.w700,
@@ -134,7 +134,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         surface: AppColors.neutral800,
         onSurface: AppColors.neutral0,
         primary: AppColors.neutral0,
@@ -142,12 +142,12 @@ class AppTheme {
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.neutral900,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.neutral900,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           color: AppColors.neutral0,
           fontSize: 28,
           fontWeight: FontWeight.w700,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
@@ -7,13 +8,23 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().initialize();
-  await NotificationService().requestPermissions();
+  
+  // Initialize timezone data
+  tz.initializeTimeZones();
+  
+  // Initialize notifications (wrapped in try-catch to prevent crash)
+  try {
+    await NotificationService().initialize();
+    await NotificationService().requestPermissions();
+  } catch (e) {
+    debugPrint('Notification initialization failed: $e');
+  }
+  
   runApp(const ProviderScope(child: HabiteraApp()));
 }
 
 class HabiteraApp extends ConsumerWidget {
-  const HabiteraApp({Key? key}) : super(key: key);
+  const HabiteraApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

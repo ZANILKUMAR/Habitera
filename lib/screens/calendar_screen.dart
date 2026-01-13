@@ -16,7 +16,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Color _getHeatmapColor(int percentage, bool isDark) {
     if (percentage == 0) {
-      return isDark ? Colors.grey.shade800.withValues(alpha: 0.5) : Colors.grey.shade100;
+      return isDark
+          ? Colors.grey.shade800.withValues(alpha: 0.5)
+          : Colors.grey.shade100;
     } else if (percentage < 25) {
       return const Color(0xFFE8F5E9);
     } else if (percentage < 50) {
@@ -82,16 +84,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       children: [
                         // Header
                         _buildHeader(theme),
-                        
+
                         // Stats summary cards
                         _buildStatsSummary(heatmap, theme, isDark),
-                        
+
                         // Monthly calendar
                         _buildMonthlyCalendar(heatmap, theme, isDark),
-                        
+
                         // Activity heatmap
                         _buildHeatmapSection(heatmap, theme, isDark),
-                        
+
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -129,10 +131,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildStatsSummary(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+  Widget _buildStatsSummary(
+      Map<String, int> heatmap, ThemeData theme, bool isDark) {
     final perfectDays = heatmap.values.where((v) => v >= 100).length;
-    final avgCompletion = heatmap.isEmpty 
-        ? 0 
+    final avgCompletion = heatmap.isEmpty
+        ? 0
         : (heatmap.values.reduce((a, b) => a + b) / heatmap.length).round();
 
     // Calculate current streak
@@ -189,7 +192,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildStatCard(String emoji, String value, String label, Color color, ThemeData theme, bool isDark) {
+  Widget _buildStatCard(String emoji, String value, String label, Color color,
+      ThemeData theme, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
@@ -230,7 +234,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildMonthlyCalendar(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+  Widget _buildMonthlyCalendar(
+      Map<String, int> heatmap, ThemeData theme, bool isDark) {
     final now = DateTime.now();
     final canGoNext = DateTime(_selectedMonth.year, _selectedMonth.month + 1)
         .isBefore(DateTime(now.year, now.month + 1));
@@ -241,13 +246,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: isDark ? null : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
         border: Border.all(
           color: theme.dividerColor.withValues(alpha: 0.2),
         ),
@@ -262,7 +269,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 onPressed: _previousMonth,
                 icon: const Icon(Icons.chevron_left_rounded),
                 style: IconButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  backgroundColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.1),
                 ),
               ),
               Text(
@@ -275,7 +283,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 onPressed: canGoNext ? _nextMonth : null,
                 icon: const Icon(Icons.chevron_right_rounded),
                 style: IconButton.styleFrom(
-                  backgroundColor: canGoNext 
+                  backgroundColor: canGoNext
                       ? theme.colorScheme.primary.withValues(alpha: 0.1)
                       : Colors.transparent,
                 ),
@@ -283,7 +291,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Day labels
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -294,7 +302,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         day,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -302,7 +311,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 .toList(),
           ),
           const SizedBox(height: 8),
-          
+
           // Calendar grid
           _buildCalendarGrid(heatmap, theme, isDark),
         ],
@@ -310,7 +319,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildCalendarGrid(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+  Widget _buildCalendarGrid(
+      Map<String, int> heatmap, ThemeData theme, bool isDark) {
     final firstDay = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final lastDay = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
     final startWeekday = firstDay.weekday % 7; // 0 = Sunday
@@ -329,7 +339,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         if ((week == 0 && day < startWeekday) || currentDay > daysInMonth) {
           cells.add(const SizedBox(width: 40, height: 40));
         } else {
-          final date = DateTime(_selectedMonth.year, _selectedMonth.month, currentDay);
+          final date =
+              DateTime(_selectedMonth.year, _selectedMonth.month, currentDay);
           final dateStr = DateFormat('yyyy-MM-dd').format(date);
           final percentage = heatmap[dateStr] ?? 0;
           final isToday = date.isAtSameMomentAs(today);
@@ -341,11 +352,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               height: 40,
               margin: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: isFuture 
+                color: isFuture
                     ? Colors.transparent
                     : _getHeatmapColor(percentage, isDark),
                 borderRadius: BorderRadius.circular(10),
-                border: isToday 
+                border: isToday
                     ? Border.all(color: theme.colorScheme.primary, width: 2)
                     : null,
               ),
@@ -376,20 +387,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return Column(children: rows);
   }
 
-  Widget _buildHeatmapSection(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+  Widget _buildHeatmapSection(
+      Map<String, int> heatmap, ThemeData theme, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: isDark ? null : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
         border: Border.all(
           color: theme.dividerColor.withValues(alpha: 0.2),
         ),
@@ -410,7 +424,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildHeatmap(heatmap, isDark, theme),
+          _build3MonthCalendarGrid(heatmap, isDark, theme),
         ],
       ),
     );
@@ -455,70 +469,128 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildHeatmap(Map<String, int> heatmap, bool isDark, ThemeData theme) {
+  Widget _build3MonthCalendarGrid(Map<String, int> heatmap, bool isDark, ThemeData theme) {
     final now = DateTime.now();
-    final daysBack = 91;
-    final endDate = DateTime(now.year, now.month, now.day);
-    final startDate = endDate.subtract(Duration(days: daysBack));
-    final adjustedStart = startDate.subtract(Duration(days: startDate.weekday % 7));
-    final numDays = endDate.difference(adjustedStart).inDays + 1;
-    final numWeeks = (numDays / 7).ceil();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    final grid = List.generate(7, (dayOfWeek) {
-      return List.generate(numWeeks, (weekIndex) {
-        final date = adjustedStart.add(Duration(days: weekIndex * 7 + dayOfWeek));
-        if (date.isAfter(endDate)) return null;
+    // Calculate ~90 days back from end of current week
+    final endOfWeek = today.add(Duration(days: 7 - today.weekday));
+    final startDate = endOfWeek.subtract(const Duration(days: 90));
+    // Adjust start to Monday of that week
+    final adjustedStart = startDate.subtract(Duration(days: (startDate.weekday - 1)));
+    final daysDiff = endOfWeek.difference(adjustedStart).inDays + 1;
+    final numWeeks = (daysDiff / 7).ceil();
+    
+    // Find unique months to display
+    Map<int, String> monthHeaders = {};
+    for (int week = 0; week < numWeeks; week++) {
+      final weekStart = adjustedStart.add(Duration(days: week * 7));
+      if (week == 0 || weekStart.month != adjustedStart.add(Duration(days: (week - 1) * 7)).month) {
+        monthHeaders[week] = DateFormat('MMM').format(weekStart);
+        if (weekStart.month == 1 || week == 0) {
+          monthHeaders[week] = '${DateFormat('MMM').format(weekStart)} ${weekStart.year}';
+        }
+      }
+    }
+    
+    List<Widget> weekColumns = [];
+    
+    for (int week = 0; week < numWeeks; week++) {
+      List<Widget> dayWidgets = [];
+      
+      // Month header
+      dayWidgets.add(
+        SizedBox(
+          height: 20,
+          child: monthHeaders.containsKey(week)
+              ? Text(
+                  monthHeaders[week]!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                )
+              : null,
+        ),
+      );
+      
+      for (int day = 0; day < 7; day++) {
+        final date = adjustedStart.add(Duration(days: week * 7 + day));
         final dateStr = DateFormat('yyyy-MM-dd').format(date);
-        return MapEntry(dateStr, heatmap[dateStr] ?? 0);
-      });
-    });
-
-    final dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+        final percentage = heatmap[dateStr] ?? 0;
+        final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+        final isFuture = date.isAfter(today);
+        
+        dayWidgets.add(
+          Tooltip(
+            message: '${DateFormat('MMM d, yyyy').format(date)}: $percentage%',
+            child: Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                color: isFuture
+                    ? Colors.transparent
+                    : _getHeatmapColor(percentage, isDark),
+                borderRadius: BorderRadius.circular(6),
+                border: isToday
+                    ? Border.all(color: theme.colorScheme.primary, width: 2)
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  date.day.toString(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isFuture
+                        ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                        : percentage >= 50
+                            ? Colors.white
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      
+      weekColumns.add(Column(children: dayWidgets));
+    }
+    
+    // Day name labels column
+    List<Widget> dayLabels = [
+      const SizedBox(height: 20),
+    ];
+    for (final dayName in dayNames) {
+      dayLabels.add(
+        Container(
+          height: 36,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          alignment: Alignment.center,
+          child: Text(
+            dayName,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+          ),
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: List.generate(7, (i) => Container(
-              width: 16,
-              height: 14,
-              alignment: Alignment.centerLeft,
-              margin: const EdgeInsets.only(bottom: 2),
-              child: Text(
-                dayLabels[i],
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  fontSize: 10,
-                ),
-              ),
-            )),
-          ),
-          const SizedBox(width: 4),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: List.generate(7, (dayOfWeek) => Row(
-              children: List.generate(numWeeks, (weekIndex) {
-                final entry = grid[dayOfWeek][weekIndex];
-                if (entry == null) {
-                  return Container(width: 12, height: 12, margin: const EdgeInsets.all(1));
-                }
-                return Tooltip(
-                  message: '${DateFormat('MMM d').format(DateTime.parse(entry.key))}: ${entry.value}%',
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    margin: const EdgeInsets.all(1),
-                    decoration: BoxDecoration(
-                      color: _getHeatmapColor(entry.value, isDark),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                );
-              }),
-            )),
-          ),
+          ...weekColumns,
+          const SizedBox(width: 8),
+          Column(children: dayLabels),
         ],
       ),
     );

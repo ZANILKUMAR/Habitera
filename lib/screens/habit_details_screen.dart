@@ -38,6 +38,8 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   // Calendar state
   DateTime _selectedMonth = DateTime.now();
   Set<DateTime> _completionDates = {};
+  Set<String> _completionDatesWithNotes =
+      {}; // Dates with notes in 'yyyy-MM-dd' format
 
   @override
   void initState() {
@@ -140,6 +142,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     // Build completion dates set for calendar
     _completionDates = completions
         .map((c) => DateTime(c.date.year, c.date.month, c.date.day))
+        .toSet();
+
+    // Build set of dates that have notes
+    _completionDatesWithNotes = completions
+        .where((c) => c.notes != null && c.notes!.isNotEmpty)
+        .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
         .toSet();
 
     // Last week completions
@@ -270,7 +278,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         title: const Text('Delete Habit?'),
         content: Text(
           'Are you sure you want to delete "${_habit?.title}"?\n\n'
-          'This will remove all ${_totalCompletions} completion records. '
+          'This will remove all $_totalCompletions completion records. '
           'This action cannot be undone.',
         ),
         actions: [
@@ -623,15 +631,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Last 60 Days',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Calendar',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            TextButton(
+              onPressed: () => _showEditCalendarSheet(theme, isDark),
+              child: const Text('EDIT'),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isDark ? theme.colorScheme.surface : Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -639,13 +657,13 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               color: theme.dividerColor.withValues(alpha: 0.3),
             ),
           ),
-          child: _buildMiniCalendar(theme, isDark),
+          child: _buildCalendarGrid(theme, isDark),
         ),
       ],
     );
   }
 
-  Widget _buildMiniCalendar(ThemeData theme, bool isDark) {
+  Widget _buildCalendarGrid(ThemeData theme, bool isDark) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final completionDates = _completions
@@ -653,37 +671,888 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         .toSet();
 
     final habitColor = _parseColor(_habit?.color);
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Build 60 days grid (6 rows x 10 columns)
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      children: List.generate(60, (index) {
-        final date = today.subtract(Duration(days: 59 - index));
+    // Calculate 60 days worth of weeks (approximately 9 weeks)
+    final startDate = today.subtract(const Duration(days: 59));
+
+    // Adjust to start from Monday of that week
+    final adjustedStart =
+        startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
+
+    // Calculate weeks to show
+    final daysDiff = today.difference(adjustedStart).inDays;
+    final numWeeks = (daysDiff / 7).ceil() + 1;
+
+    // Build week columns with dates
+    List<Widget> weekColumns = [];
+
+    // Find unique months to display
+    Map<int, String> monthHeaders = {};
+    for (int week = 0; week < numWeeks; week++) {
+      final weekStart = adjustedStart.add(Duration(days: week * 7));
+      if (week == 0 ||
+          weekStart.month !=
+              adjustedStart.add(Duration(days: (week - 1) * 7)).month) {
+        monthHeaders[week] = DateFormat('MMM').format(weekStart);
+        if (weekStart.month == 1 || week == 0) {
+          monthHeaders[week] =
+              '${DateFormat('MMM').format(weekStart)} ${weekStart.year}';
+        }
+      }
+    }
+
+    for (int week = 0; week < numWeeks; week++) {
+      List<Widget> dayWidgets = [];
+
+      // Add month header if applicable
+      dayWidgets.add(
+        SizedBox(
+          height: 20,
+          child: monthHeaders.containsKey(week)
+              ? Text(
+                  monthHeaders[week]!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                )
+              : null,
+        ),
+      );
+
+      for (int day = 0; day < 7; day++) {
+        final date = adjustedStart.add(Duration(days: week * 7 + day));
         final dateStr = DateFormat('yyyy-MM-dd').format(date);
         final isCompleted = completionDates.contains(dateStr);
-        final isToday = index == 59;
+        final hasNotes = _completionDatesWithNotes.contains(dateStr);
+        final isToday = date.year == today.year &&
+            date.month == today.month &&
+            date.day == today.day;
+        final isFuture = date.isAfter(today);
+        final isBeforeStart = date.isBefore(startDate);
 
-        return Tooltip(
-          message: DateFormat('MMM d').format(date),
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isCompleted
-                  ? habitColor.withValues(alpha: 0.8)
-                  : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-              borderRadius: BorderRadius.circular(4),
-              border: isToday
-                  ? Border.all(color: theme.colorScheme.primary, width: 2)
-                  : null,
+        dayWidgets.add(
+          Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? habitColor
+                        : (isFuture || isBeforeStart)
+                            ? Colors.transparent
+                            : (isDark
+                                    ? Colors.grey.shade800
+                                    : Colors.grey.shade700)
+                                .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(6),
+                    border: isToday
+                        ? Border.all(color: habitColor, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      date.day.toString(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isCompleted
+                            ? Colors.white
+                            : isFuture
+                                ? theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.3)
+                                : theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.8),
+                        fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+                if (hasNotes)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            child: isCompleted
-                ? const Icon(Icons.check, size: 14, color: Colors.white)
-                : null,
           ),
         );
-      }),
+      }
+
+      weekColumns.add(Column(children: dayWidgets));
+    }
+
+    // Day name labels column
+    List<Widget> dayLabels = [
+      const SizedBox(height: 20), // Space for month headers
+    ];
+    for (final dayName in dayNames) {
+      dayLabels.add(
+        Container(
+          height: 36,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          alignment: Alignment.center,
+          child: Text(
+            dayName,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...weekColumns,
+          const SizedBox(width: 8),
+          Column(children: dayLabels),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleCompletion(DateTime date,
+      {VoidCallback? onComplete}) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final existingCompletion = _completions.cast<Completion?>().firstWhere(
+          (c) =>
+              c != null && DateFormat('yyyy-MM-dd').format(c.date) == dateStr,
+          orElse: () => null,
+        );
+    final isCompleted = existingCompletion != null;
+
+    if (isCompleted) {
+      // Show options to edit notes or undo
+      await _showCompletionOptionsSheet(date, existingCompletion, onComplete);
+    } else {
+      // Show popup to add completion with optional notes
+      await _showAddCompletionSheet(date, onComplete);
+    }
+  }
+
+  Future<void> _showAddCompletionSheet(
+      DateTime date, VoidCallback? onComplete) async {
+    final notesController = TextEditingController();
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[600] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (_habit?.icon != null && _habit!.icon!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          _habit!.icon!,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      ),
+                    Expanded(
+                      child: Text(
+                        _habit?.title ?? 'Mark Complete',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat('EEEE, MMMM d').format(date),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                // Show reflective question if exists (stored as "QUESTION|||NOTES")
+                Builder(builder: (context) {
+                  String? reflectiveQuestion;
+                  if (_habit?.description != null &&
+                      _habit!.description!.isNotEmpty) {
+                    if (_habit!.description!.contains('|||')) {
+                      final parts = _habit!.description!.split('|||');
+                      if (parts[0].isNotEmpty) {
+                        reflectiveQuestion = parts[0];
+                      }
+                    } else {
+                      // If no separator, treat as reflective question
+                      reflectiveQuestion = _habit!.description;
+                    }
+                  }
+
+                  if (reflectiveQuestion == null ||
+                      reflectiveQuestion.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer
+                              .withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.lightbulb_outline,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reflectiveQuestion,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.8),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      hintText: 'Add notes (optional)',
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(16),
+                      hintStyle: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('OK'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result == true) {
+      try {
+        final notes = notesController.text.trim().isEmpty
+            ? null
+            : notesController.text.trim();
+        await _db.recordCompletion(widget.habitId, date, notes: notes);
+        await _loadData();
+        ref.invalidate(habitsProvider);
+        ref.invalidate(dailyStatsProvider);
+        ref.invalidate(heatmapProvider);
+        onComplete?.call();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+
+    notesController.dispose();
+  }
+
+  Future<void> _showCompletionOptionsSheet(
+      DateTime date, Completion completion, VoidCallback? onComplete) async {
+    final notesController = TextEditingController(text: completion.notes ?? '');
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[600] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: theme.colorScheme.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Completed',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat('EEEE, MMMM d').format(date),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      hintText: 'Add notes (optional)',
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(16),
+                      hintStyle: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context, 'undo'),
+                        icon: const Icon(Icons.undo, size: 18),
+                        label: const Text('Undo'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          foregroundColor: Colors.red,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, 'save'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result == 'undo') {
+      try {
+        await _db.undoCompletion(widget.habitId, date);
+        await _loadData();
+        ref.invalidate(habitsProvider);
+        ref.invalidate(dailyStatsProvider);
+        ref.invalidate(heatmapProvider);
+        onComplete?.call();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    } else if (result == 'save') {
+      try {
+        final notes = notesController.text.trim().isEmpty
+            ? null
+            : notesController.text.trim();
+        await _db.updateCompletionNotes(widget.habitId, date, notes);
+      } catch (e) {
+        // Ignore errors for notes update
+      }
+    }
+
+    notesController.dispose();
+  }
+
+  void _showEditCalendarSheet(ThemeData theme, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Edit Completions',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Tap on any date to mark or unmark completion',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Calendar
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? theme.colorScheme.surfaceContainerHighest
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: _buildEditableCalendarGrid(
+                          theme, isDark, setSheetState),
+                    ),
+                  ),
+                ),
+                // Legend
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLegendItem(
+                          theme, _parseColor(_habit?.color), 'Completed'),
+                      const SizedBox(width: 20),
+                      _buildLegendItem(
+                          theme,
+                          isDark ? Colors.grey.shade800 : Colors.grey.shade400,
+                          'Not done'),
+                      const SizedBox(width: 20),
+                      _buildNotesLegendItem(theme, isDark),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      ),
+    ).then((_) {
+      // Refresh when sheet is closed
+      _loadData();
+    });
+  }
+
+  Widget _buildEditableCalendarGrid(
+      ThemeData theme, bool isDark, StateSetter setSheetState) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final completionDates = _completions
+        .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
+        .toSet();
+
+    // Track dates that have notes
+    final datesWithNotes = _completions
+        .where((c) => c.notes != null && c.notes!.isNotEmpty)
+        .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
+        .toSet();
+
+    final habitColor = _parseColor(_habit?.color);
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    // Calculate 60 days worth of weeks
+    final startDate = today.subtract(const Duration(days: 59));
+    final adjustedStart =
+        startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
+    final daysDiff = today.difference(adjustedStart).inDays;
+    final numWeeks = (daysDiff / 7).ceil() + 1;
+
+    // Find unique months to display
+    Map<int, String> monthHeaders = {};
+    for (int week = 0; week < numWeeks; week++) {
+      final weekStart = adjustedStart.add(Duration(days: week * 7));
+      if (week == 0 ||
+          weekStart.month !=
+              adjustedStart.add(Duration(days: (week - 1) * 7)).month) {
+        monthHeaders[week] = DateFormat('MMM').format(weekStart);
+        if (weekStart.month == 1 || week == 0) {
+          monthHeaders[week] =
+              '${DateFormat('MMM').format(weekStart)} ${weekStart.year}';
+        }
+      }
+    }
+
+    List<Widget> weekColumns = [];
+
+    for (int week = 0; week < numWeeks; week++) {
+      List<Widget> dayWidgets = [];
+
+      dayWidgets.add(
+        SizedBox(
+          height: 20,
+          child: monthHeaders.containsKey(week)
+              ? Text(
+                  monthHeaders[week]!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                )
+              : null,
+        ),
+      );
+
+      for (int day = 0; day < 7; day++) {
+        final date = adjustedStart.add(Duration(days: week * 7 + day));
+        final dateStr = DateFormat('yyyy-MM-dd').format(date);
+        final isCompleted = completionDates.contains(dateStr);
+        final hasNotes = datesWithNotes.contains(dateStr);
+        final isToday = date.year == today.year &&
+            date.month == today.month &&
+            date.day == today.day;
+        final isFuture = date.isAfter(today);
+        final isBeforeStart = date.isBefore(startDate);
+
+        dayWidgets.add(
+          GestureDetector(
+            onTap: (!isFuture && !isBeforeStart)
+                ? () async {
+                    await _toggleCompletion(date, onComplete: () {
+                      setSheetState(() {});
+                    });
+                  }
+                : null,
+            child: Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? habitColor
+                          : (isFuture || isBeforeStart)
+                              ? Colors.transparent
+                              : (isDark
+                                      ? Colors.grey.shade800
+                                      : Colors.grey.shade700)
+                                  .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(6),
+                      border: isToday
+                          ? Border.all(color: habitColor, width: 2)
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        date.day.toString(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: isCompleted
+                              ? Colors.white
+                              : isFuture
+                                  ? theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.3)
+                                  : theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.8),
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Notes indicator - small dot in top-right corner
+                  if (hasNotes)
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.amber.shade300
+                              : Colors.amber.shade600,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 1,
+                              offset: const Offset(0, 0.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      weekColumns.add(Column(children: dayWidgets));
+    }
+
+    // Day name labels column
+    List<Widget> dayLabels = [
+      const SizedBox(height: 20),
+    ];
+    for (final dayName in dayNames) {
+      dayLabels.add(
+        Container(
+          height: 36,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          alignment: Alignment.center,
+          child: Text(
+            dayName,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...weekColumns,
+          const SizedBox(width: 8),
+          Column(children: dayLabels),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(ThemeData theme, Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotesLegendItem(ThemeData theme, bool isDark) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color:
+                        isDark ? Colors.amber.shade300 : Colors.amber.shade600,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Has notes',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
@@ -975,6 +1844,161 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     }
   }
 
+  void _showNotesPopup(DateTime date, String dateStr, Color habitColor,
+      ThemeData theme, bool isDark) {
+    // Find the completion with notes for this date
+    final completion = _completions.firstWhere(
+      (c) => DateFormat('yyyy-MM-dd').format(c.date) == dateStr,
+      orElse: () => _completions.first,
+    );
+
+    if (completion.notes == null || completion.notes!.isEmpty) return;
+
+    // Parse notes - handle "QUESTION|||NOTES" format
+    String displayNotes = completion.notes!;
+    String? reflectiveQuestion;
+
+    if (displayNotes.contains('|||')) {
+      final parts = displayNotes.split('|||');
+      reflectiveQuestion = parts[0];
+      displayNotes = parts.length > 1 ? parts[1] : '';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: habitColor.withValues(alpha: 0.1),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: habitColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.note_alt_rounded,
+                        color: habitColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reflection',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('EEEE, MMM d, yyyy').format(date),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (reflectiveQuestion != null &&
+                        reflectiveQuestion.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('💭', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reflectiveQuestion,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Text(
+                      displayNotes.isNotEmpty
+                          ? displayNotes
+                          : 'No additional notes',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.5,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Calendar Section with colored completion dates
   Widget _buildCalendarSection(Color habitColor, ThemeData theme, bool isDark) {
     final now = DateTime.now();
@@ -1101,38 +2125,64 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
 
                   final date = DateTime(
                       _selectedMonth.year, _selectedMonth.month, dayNumber);
+                  final dateStr = DateFormat('yyyy-MM-dd').format(date);
                   final isCompleted = _completionDates.contains(date);
+                  final hasNotes = _completionDatesWithNotes.contains(dateStr);
                   final isToday = date.year == now.year &&
                       date.month == now.month &&
                       date.day == now.day;
                   final isFuture = date.isAfter(now);
 
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? habitColor
-                          : isToday
-                              ? habitColor.withValues(alpha: 0.2)
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isToday && !isCompleted
-                          ? Border.all(color: habitColor, width: 2)
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        dayNumber.toString(),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight:
-                              isToday ? FontWeight.bold : FontWeight.normal,
-                          color: isCompleted
-                              ? Colors.white
-                              : isFuture
-                                  ? theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.3)
-                                  : theme.colorScheme.onSurface,
+                  return GestureDetector(
+                    onTap: hasNotes
+                        ? () => _showNotesPopup(
+                            date, dateStr, habitColor, theme, isDark)
+                        : null,
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isCompleted
+                                ? habitColor
+                                : isToday
+                                    ? habitColor.withValues(alpha: 0.2)
+                                    : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: isToday && !isCompleted
+                                ? Border.all(color: habitColor, width: 2)
+                                : null,
+                          ),
+                          child: Center(
+                            child: Text(
+                              dayNumber.toString(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: isToday
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isCompleted
+                                    ? Colors.white
+                                    : isFuture
+                                        ? theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.3)
+                                        : theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (hasNotes)
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.amber,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },

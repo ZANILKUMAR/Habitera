@@ -35,9 +35,9 @@ class AddHabitScreen extends ConsumerStatefulWidget {
   final String? habitId;
 
   const AddHabitScreen({
-    Key? key,
+    super.key,
     this.habitId,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<AddHabitScreen> createState() => _AddHabitScreenState();
@@ -46,6 +46,7 @@ class AddHabitScreen extends ConsumerStatefulWidget {
 class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
   late TextEditingController titleController;
   late TextEditingController descriptionController;
+  late TextEditingController questionController;
   late DatabaseService _db;
   late NotificationService _notificationService;
 
@@ -60,6 +61,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
   TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
   Habit? existingHabit;
   bool isLoading = true;
+  bool _showMoreOptions = true;
 
   final List<String> weekDayNames = [
     'Mon',
@@ -78,6 +80,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     _notificationService = NotificationService();
     titleController = TextEditingController();
     descriptionController = TextEditingController();
+    questionController = TextEditingController();
 
     if (widget.habitId != null) {
       _loadHabit();
@@ -92,7 +95,16 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       setState(() {
         existingHabit = habit;
         titleController.text = habit.title;
-        descriptionController.text = habit.description ?? '';
+        
+        // Parse description: format is "QUESTION|||NOTES" or just notes
+        if (habit.description != null && habit.description!.contains('|||')) {
+          final parts = habit.description!.split('|||');
+          questionController.text = parts[0];
+          descriptionController.text = parts.length > 1 ? parts[1] : '';
+        } else {
+          descriptionController.text = habit.description ?? '';
+        }
+        
         frequency = habit.frequency.toString().split('.').last;
 
         // Load custom values based on frequency
@@ -202,13 +214,26 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     }
 
     try {
+      // Combine question and notes into description field
+      String? combinedDescription;
+      final question = questionController.text.trim();
+      final notes = descriptionController.text.trim();
+      
+      if (question.isNotEmpty || notes.isNotEmpty) {
+        if (question.isNotEmpty && notes.isNotEmpty) {
+          combinedDescription = '$question|||$notes';
+        } else if (question.isNotEmpty) {
+          combinedDescription = '$question|||';
+        } else {
+          combinedDescription = notes;
+        }
+      }
+      
       final habit = Habit(
         id: existingHabit?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
         title: titleController.text,
-        description: descriptionController.text.isEmpty
-            ? null
-            : descriptionController.text,
+        description: combinedDescription,
         frequency: HabitFrequency.values.firstWhere(
           (f) => f.toString().split('.').last == frequency,
         ),
@@ -242,49 +267,51 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     }
   }
 
   void _deleteHabit() async {
     if (existingHabit == null) return;
 
-    showDialog(
+    final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Habit?'),
         content: const Text('This action cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              // Cancel any existing notification
-              await _notificationService.cancelReminder(existingHabit!.id);
-              await _db.deleteHabit(existingHabit!.id);
-              // Invalidate providers to refresh the habits list
-              ref.invalidate(habitsProvider);
-              ref.invalidate(dailyStatsProvider);
-              if (mounted) {
-                Navigator.pop(dialogContext);
-                Navigator.pop(context);
-              }
-            },
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (shouldDelete == true) {
+      await _notificationService.cancelReminder(existingHabit!.id);
+      await _db.deleteHabit(existingHabit!.id);
+      ref.invalidate(habitsProvider);
+      ref.invalidate(dailyStatsProvider);
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
   void dispose() {
     titleController.dispose();
     descriptionController.dispose();
+    questionController.dispose();
     super.dispose();
   }
 
@@ -297,262 +324,286 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       );
     }
 
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(existingHabit == null ? 'New Habit' : 'Edit Habit'),
         elevation: 0,
+        actions: [
+          TextButton(
+            onPressed: _saveHabit,
+            child: Text(
+              existingHabit == null ? 'Create' : 'Save',
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            _buildSection(
-              'Habit Name',
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  hintText: 'e.g., Morning Meditation',
-                ),
-              ),
-            ),
-
-            // Description
-            _buildSection(
-              'Description (Optional)',
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  hintText: 'Why is this habit important to you?',
-                ),
-                maxLines: 3,
-              ),
-            ),
-
-            // Frequency
-            _buildSection(
-              'Frequency',
-              InkWell(
-                onTap: _showFrequencyPicker,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outline
-                          .withOpacity(0.3),
-                    ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title Input - Matching style with other controls
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.2),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          _getFrequencyIcon(),
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 20,
-                        ),
+                ),
+                child: Center(
+                  child: TextField(
+                    controller: titleController,
+                    autofocus: existingHabit == null,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Habit name',
+                      hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w400,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getFrequencyTitle(),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            Text(
-                              _getFrequencySubtitle(),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ],
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Icon Selection
-            _buildSection(
-              'Icon',
-              GridView.count(
-                crossAxisCount: 6,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: habitIcons.map((icon) {
-                  return InkWell(
-                    onTap: () => setState(() => selectedIcon = icon),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: selectedIcon == icon
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.surface,
-                      ),
-                      child: Center(
-                        child: Text(icon, style: const TextStyle(fontSize: 24)),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+              const SizedBox(height: 12),
 
-            // Color Selection
-            _buildSection(
-              'Color',
-              Wrap(
-                spacing: 12,
-                children: habitColors.map((color) {
-                  return GestureDetector(
-                    onTap: () => setState(() => selectedColor = color),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color:
-                            Color(int.parse(color.replaceFirst('#', '0xff'))),
-                        borderRadius: BorderRadius.circular(12),
-                        border: selectedColor == color
-                            ? Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 3,
-                              )
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-            // Reminder
-            _buildSection(
-              'Daily Reminder',
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Enable reminder'),
-                      Switch(
-                        value: hasReminder,
-                        onChanged: (value) =>
-                            setState(() => hasReminder = value),
-                      ),
-                    ],
+              // Question field - Matching style with other controls
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.2),
                   ),
-                  if (hasReminder)
-                    InkWell(
-                      onTap: _pickTime,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _formatTimeOfDay(selectedTime),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ),
+                ),
+                child: Center(
+                  child: TextField(
+                    controller: questionController,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontStyle: FontStyle.italic,
                     ),
-                ],
+                    decoration: InputDecoration(
+                      hintText: 'Add a reflective question (optional)',
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontStyle: FontStyle.italic,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
-            // Action Buttons
-            Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saveHabit,
+              // Icon & Color Row - Both as buttons
+              _buildIconColorRow(theme),
+
+              const SizedBox(height: 20),
+
+              // Frequency - Compact card
+              _buildCompactFrequencySelector(theme),
+
+              const SizedBox(height: 16),
+
+              // More Options - Expandable
+              _buildMoreOptionsSection(theme),
+
+              const Spacer(),
+
+              // Delete button for existing habits (at bottom)
+              if (existingHabit != null)
+                Center(
+                  child: TextButton(
+                    onPressed: _deleteHabit,
                     child: Text(
-                      existingHabit == null ? 'Create Habit' : 'Update Habit',
+                      'Delete Habit',
+                      style: TextStyle(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
-                if (existingHabit != null) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.error,
+
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconColorRow(ThemeData theme) {
+    final selectedColorValue = Color(int.parse(selectedColor.replaceFirst('#', '0xff')));
+    
+    return Row(
+      children: [
+        // Icon selector button
+        Expanded(
+          child: GestureDetector(
+            onTap: _showIconPicker,
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(selectedIcon, style: const TextStyle(fontSize: 24)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Icon',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-                      onPressed: _deleteHabit,
-                      child: const Text('Delete Habit'),
                     ),
                   ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ],
-              ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Color selector button
+        Expanded(
+          child: GestureDetector(
+            onTap: _showColorPicker,
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: selectedColorValue,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Color',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactFrequencySelector(ThemeData theme) {
+    return InkWell(
+      onTap: _showFrequencyPicker,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _getFrequencyIcon(),
+                color: theme.colorScheme.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _getFrequencyTitle(),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    _getFrequencySubtitle(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
             ),
           ],
         ),
@@ -560,19 +611,276 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     );
   }
 
-  Widget _buildSection(String title, Widget child) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall,
+  Widget _buildMoreOptionsSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Expandable header
+        InkWell(
+          onTap: () => setState(() => _showMoreOptions = !_showMoreOptions),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  _showMoreOptions
+                      ? Icons.keyboard_arrow_down_rounded
+                      : Icons.keyboard_arrow_right_rounded,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'More options',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          child,
-        ],
+        ),
+
+        // Expandable content
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: _showMoreOptions
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Description - Matching style with other controls
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: descriptionController,
+                    decoration: InputDecoration(
+                      hintText: 'Add a note (optional)',
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    maxLines: 2,
+                    minLines: 1,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Reminder toggle
+                Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_outlined,
+                        size: 20,
+                        color: hasReminder
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          hasReminder
+                              ? 'Reminder at ${_formatTimeOfDay(selectedTime)}'
+                              : 'Set a reminder',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (hasReminder)
+                        GestureDetector(
+                          onTap: _pickTime,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              'Change',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Switch(
+                        value: hasReminder,
+                        onChanged: (value) async {
+                          setState(() => hasReminder = value);
+                          if (value) {
+                            await _pickTime();
+                          }
+                        },
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showIconPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Choose an icon',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 6,
+              shrinkWrap: true,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              children: habitIcons.map((icon) {
+                final isSelected = selectedIcon == icon;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => selectedIcon = icon);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: isSelected
+                          ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(icon, style: const TextStyle(fontSize: 28)),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showColorPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Choose a color',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              children: habitColors.map((color) {
+                final colorValue = Color(int.parse(color.replaceFirst('#', '0xff')));
+                final isSelected = selectedColor == color;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => selectedColor = color);
+                    Navigator.pop(context);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color: colorValue,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isSelected
+                          ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
+                          : null,
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: colorValue.withValues(alpha: 0.5), blurRadius: 12)]
+                          : null,
+                    ),
+                    child: isSelected
+                        ? const Center(
+                            child: Icon(Icons.check, color: Colors.white, size: 28),
+                          )
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
@@ -662,7 +970,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
-                        .withOpacity(0.2),
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -897,7 +1205,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                      : Theme.of(context)
+                          .colorScheme
+                          .outline
+                          .withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -919,7 +1230,9 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                             fontWeight:
                                 isSelected ? FontWeight.bold : FontWeight.w500,
                             color: isSelected
-                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
                                 : Theme.of(context).colorScheme.onSurface,
                           ),
                     ),
@@ -927,8 +1240,13 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                       subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: isSelected
-                                ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
+                                    .withValues(alpha: 0.8)
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                           ),
                     ),
                   ],
@@ -959,7 +1277,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
         ),
       ),
       child: Column(

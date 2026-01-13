@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../models/habit.dart';
@@ -16,16 +17,16 @@ class NotificationService {
 
   Future<void> initialize() async {
     const AndroidInitializationSettings androidInitializationSettings =
-        AndroidInitializationSettings('app_icon');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    final DarwinInitializationSettings iosInitializationSettings =
+    const DarwinInitializationSettings iosInitializationSettings =
         DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    final InitializationSettings initializationSettings =
+    const InitializationSettings initializationSettings =
         InitializationSettings(
       android: androidInitializationSettings,
       iOS: iosInitializationSettings,
@@ -87,13 +88,13 @@ class NotificationService {
             badgeNumber: 1,
           ),
         ),
-        androidAllowWhileIdle: true,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
-      print('Error scheduling reminder: $e');
+      debugPrint('Error scheduling reminder: $e');
     }
   }
 
@@ -142,7 +143,7 @@ class NotificationService {
     int minutesToSnooze = 10,
   }) async {
     final snoozeTime = DateTime.now().add(Duration(minutes: minutesToSnooze));
-    
+
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       habitId.hashCode + 1,
       'Habit reminder',
@@ -156,7 +157,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

@@ -7,12 +7,12 @@ class StatCard extends StatelessWidget {
   final Color? color;
 
   const StatCard({
-    Key? key,
+    super.key,
     required this.label,
     required this.value,
     this.icon,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,8 @@ class StatCard extends StatelessWidget {
             Row(
               children: [
                 if (icon != null)
-                  Icon(icon, color: color ?? Theme.of(context).colorScheme.primary),
+                  Icon(icon,
+                      color: color ?? Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(label, style: Theme.of(context).textTheme.bodySmall),
               ],
