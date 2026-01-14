@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
@@ -228,9 +228,15 @@ class DatabaseService {
   }
 
   Future<Habit> createHabit(Habit habit) async {
-    final db = await database;
-    await db.insert('habits', _habitToMap(habit));
-    return habit;
+    try {
+      final db = await database;
+      await db.insert('habits', _habitToMap(habit));
+      debugPrint('Habit created: ${habit.title} (id: ${habit.id})');
+      return habit;
+    } catch (e) {
+      debugPrint('Error creating habit: $e');
+      rethrow;
+    }
   }
 
   Future<void> updateHabit(Habit habit) async {
@@ -602,6 +608,18 @@ class DatabaseService {
     await db.delete('completions');
     await db.delete('habits');
     // Don't delete settings - keep user preferences
+    
+    // Force a fresh query on next access
+    debugPrint('All data cleared from database');
+  }
+
+  /// Close the database connection (useful for testing or forcing refresh)
+  Future<void> closeDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      debugPrint('Database connection closed');
+    }
   }
 
   // Helper methods

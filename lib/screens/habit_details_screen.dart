@@ -669,12 +669,9 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Start from habit creation date or 3 months back, whichever is earlier
-    final habitCreatedAt =
-        _habit?.createdAt ?? today.subtract(const Duration(days: 365));
-    final threeMonthsAgo = today.subtract(const Duration(days: 90));
-    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
-    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
+    // Show 2 years of history (no restriction) - allows backfilling completions
+    final twoYearsAgo = today.subtract(const Duration(days: 730));
+    final startDate = DateTime(twoYearsAgo.year, twoYearsAgo.month, twoYearsAgo.day);
 
     // Adjust to start from Monday of that week
     final adjustedStart =
@@ -1297,7 +1294,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Reflection',
+                            'Note',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -1545,12 +1542,9 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Start from habit creation date or 3 months back, whichever is earlier
-    final habitCreatedAt =
-        _habit?.createdAt ?? today.subtract(const Duration(days: 365));
-    final threeMonthsAgo = today.subtract(const Duration(days: 90));
-    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
-    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
+    // Show 2 years of history (no restriction) - allows backfilling completions
+    final twoYearsAgo = today.subtract(const Duration(days: 730));
+    final startDate = DateTime(twoYearsAgo.year, twoYearsAgo.month, twoYearsAgo.day);
     final adjustedStart =
         startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
     final daysDiff = today.difference(adjustedStart).inDays;
@@ -2185,7 +2179,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Reflection',
+                            'Note',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
