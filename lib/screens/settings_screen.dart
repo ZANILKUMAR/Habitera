@@ -170,6 +170,38 @@ class SettingsScreen extends ConsumerWidget {
                   title: Text('Build habits. Shape your life.'),
                   subtitle: Text('Habitera'),
                 ),
+                const SizedBox(height: 16),
+                
+                // Contact Section
+                Text(
+                  'Contact',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.email_outlined),
+                  title: const Text('Email'),
+                  subtitle: const Text('contact.aktechsource@gmail.com'),
+                  onTap: () {
+                    // Could launch email app
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.language_outlined),
+                  title: const Text('Website'),
+                  subtitle: const Text('www.aktechsource.com'),
+                  onTap: () {
+                    // Could launch browser
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.feedback_outlined),
+                  title: const Text('Send Feedback'),
+                  subtitle: const Text('Help us improve Habitera'),
+                  onTap: () {
+                    // Could open feedback form
+                  },
+                ),
               ],
             ),
           ),

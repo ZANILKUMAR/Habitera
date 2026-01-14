@@ -214,10 +214,10 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
@@ -225,9 +225,12 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       contentPadding: const EdgeInsets.all(16),
                       hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                     maxLines: 3,
@@ -367,10 +370,10 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
@@ -378,9 +381,12 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       contentPadding: const EdgeInsets.all(16),
                       hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                     maxLines: 3,
@@ -580,40 +586,47 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
 
   Widget _buildDateCell(
       DateTime date, ThemeData theme, bool isDark, bool isToday) {
-    return Container(
+    return SizedBox(
       width: _dateCellWidth,
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-      decoration: BoxDecoration(
-        color: isToday
-            ? theme.colorScheme.primary.withValues(alpha: 0.1)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            DateFormat('E').format(date).substring(0, 1),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isToday
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 9,
-            ),
+      child: Center(
+        child: Container(
+          width: _dateCellWidth - 12, // Match completion cell inner width (44 - 6*2 = 32)
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            color: isToday
+                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
           ),
-          Text(
-            DateFormat('d').format(date),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: isToday
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface,
-              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 12,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormat('E').format(date).substring(0, 1),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isToday
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 9,
+                ),
+              ),
+              Text(
+                DateFormat('d').format(date),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: isToday
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
