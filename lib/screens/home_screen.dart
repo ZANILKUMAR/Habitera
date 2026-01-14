@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/habit_provider.dart';
+import '../services/notification_service.dart';
 import 'today_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
+  bool _remindersRescheduled = false;
 
   // Use late final to ensure screens are only created once
   late final List<Widget> _screens = [
@@ -19,6 +23,28 @@ class _HomeScreenState extends State<HomeScreen> {
     const CalendarScreen(),
     const SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Reschedule all reminders on app start
+    _rescheduleReminders();
+  }
+
+  Future<void> _rescheduleReminders() async {
+    if (_remindersRescheduled) return;
+    _remindersRescheduled = true;
+    
+    // Wait a bit for providers to initialize
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    try {
+      final habits = await ref.read(habitsProvider.future);
+      await NotificationService().rescheduleAllReminders(habits);
+    } catch (e) {
+      debugPrint('Error rescheduling reminders: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

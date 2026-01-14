@@ -31,6 +31,9 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            // Disable minification to prevent flutter_local_notifications issues
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

@@ -6,29 +6,40 @@ import '../services/notification_service.dart';
 import '../providers/habit_provider.dart';
 
 const List<String> habitColors = [
-  '#FF6B6B',
-  '#FFA94D',
-  '#FFD93D',
-  '#6BCB77',
-  '#4D96FF',
-  '#A78BFA',
-  '#FF88CC',
-  '#4ECDC4',
+  '#FF6B6B', // Red
+  '#FFA94D', // Orange
+  '#FFD93D', // Yellow
+  '#6BCB77', // Green
+  '#4D96FF', // Blue
+  '#A78BFA', // Purple
+  '#FF88CC', // Pink
+  '#4ECDC4', // Teal
+  '#8B5CF6', // Violet
+  '#EC4899', // Hot Pink
+  '#14B8A6', // Cyan
+  '#F97316', // Deep Orange
+  '#84CC16', // Lime
 ];
 
 const List<String> habitIcons = [
-  '🏃',
-  '📚',
-  '🧘',
-  '💪',
-  '🚴',
-  '🎨',
-  '🎵',
-  '💻',
-  '🥗',
-  '😴',
-  '🚶',
-  '⛹️',
+  // Fitness & Health
+  '🏃', '💪', '🚴', '🏋️', '🧘', '🤸', '🏊', '⛹️', '🚶', '🧗',
+  // Learning & Work
+  '📚', '💻', '📝', '🎓', '🧠', '📖', '✍️', '🔬', '📊', '💼',
+  // Arts & Music
+  '🎨', '🎵', '🎸', '🎹', '📷', '🎬', '🎭', '✏️', '🖌️', '🎤',
+  // Health & Wellness
+  '🥗', '💧', '😴', '🧘', '💊', '🍎', '🥤', '🧃', '🍵', '🧹',
+  // Hobbies & Activities
+  '🌱', '🐕', '♟️', '🎮', '📱', '🧩', '🎯', '🪴', '🎣', '⛺',
+  // Mindfulness & Self-care
+  '🧖', '💆', '🛁', '☀️', '🌙', '🙏', '💭', '📓', '✨', '🌈',
+  // Social & Communication
+  '📞', '💬', '👥', '🤝', '💌', '🎁', '👋', '💕', '🫂', '👨‍👩‍👧',
+  // Finance & Goals
+  '💰', '💵', '📈', '🎯', '🏆', '🥇', '⏰', '📅', '✅', '🔔',
+  // Common/Generic Icons (for when nothing else fits)
+  '⭐', '❤️', '🔥', '💎', '🌟', '📌', '🏁', '🚀', '💡', '🎪',
 ];
 
 class AddHabitScreen extends ConsumerStatefulWidget {
@@ -768,8 +779,12 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -796,40 +811,42 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                   ),
             ),
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 6,
-              shrinkWrap: true,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              children: habitIcons.map((icon) {
-                final isSelected = selectedIcon == icon;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => selectedIcon = icon);
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isSelected
-                          ? Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2)
-                          : Border.all(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outline
-                                  .withValues(alpha: 0.3)),
+            Flexible(
+              child: GridView.count(
+                crossAxisCount: 6,
+                shrinkWrap: true,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                children: habitIcons.map((icon) {
+                  final isSelected = selectedIcon == icon;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => selectedIcon = icon);
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2)
+                            : Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withValues(alpha: 0.3)),
+                      ),
+                      child: Center(
+                        child: Text(icon, style: const TextStyle(fontSize: 28)),
+                      ),
                     ),
-                    child: Center(
-                      child: Text(icon, style: const TextStyle(fontSize: 28)),
-                    ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -842,8 +859,12 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.5,
+        ),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -870,47 +891,49 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                   ),
             ),
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              children: habitColors.map((color) {
-                final colorValue =
-                    Color(int.parse(color.replaceFirst('#', '0xff')));
-                final isSelected = selectedColor == color;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => selectedColor = color);
-                    Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    decoration: BoxDecoration(
-                      color: colorValue,
-                      borderRadius: BorderRadius.circular(16),
-                      border: isSelected
-                          ? Border.all(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              width: 3)
-                          : null,
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                  color: colorValue.withValues(alpha: 0.5),
-                                  blurRadius: 12)
-                            ]
+            Flexible(
+              child: GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                children: habitColors.map((color) {
+                  final colorValue =
+                      Color(int.parse(color.replaceFirst('#', '0xff')));
+                  final isSelected = selectedColor == color;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => selectedColor = color);
+                      Navigator.pop(context);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      decoration: BoxDecoration(
+                        color: colorValue,
+                        borderRadius: BorderRadius.circular(16),
+                        border: isSelected
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                width: 3)
+                            : null,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                    color: colorValue.withValues(alpha: 0.5),
+                                    blurRadius: 12)
+                              ]
+                            : null,
+                      ),
+                      child: isSelected
+                          ? const Center(
+                              child: Icon(Icons.check,
+                                  color: Colors.white, size: 28),
+                            )
                           : null,
                     ),
-                    child: isSelected
-                        ? const Center(
-                            child: Icon(Icons.check,
-                                color: Colors.white, size: 28),
-                          )
-                        : null,
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
             const SizedBox(height: 12),
           ],
