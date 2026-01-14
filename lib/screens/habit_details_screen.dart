@@ -349,28 +349,24 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               _buildHeaderCard(habit, habitColor, theme, isDark),
               const SizedBox(height: 20),
 
-              // Calendar Section
-              _buildCalendarSection(habitColor, theme, isDark),
+              // Schedule Section
+              _buildFrequencySection(habit, theme, isDark),
+              const SizedBox(height: 20),
+
+              // Completion History Section
+              _buildHistoryStatsSection(habitColor, theme, isDark),
+              const SizedBox(height: 20),
+
+              // Calendar (Visual History)
+              _buildVisualHistory(theme, isDark),
               const SizedBox(height: 20),
 
               // Streak Stats
               _buildStreakSection(theme, isDark),
               const SizedBox(height: 20),
 
-              // History Stats Section
-              _buildHistoryStatsSection(habitColor, theme, isDark),
-              const SizedBox(height: 20),
-
-              // Frequency Chart Section
+              // Weekly Pattern (Frequency Chart)
               _buildFrequencyChartSection(habitColor, theme, isDark),
-              const SizedBox(height: 20),
-
-              // Visual History
-              _buildVisualHistory(theme, isDark),
-              const SizedBox(height: 20),
-
-              // Frequency Section
-              _buildFrequencySection(habit, theme, isDark),
               const SizedBox(height: 20),
 
               // Highlights Section
@@ -673,8 +669,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Calculate 60 days worth of weeks (approximately 9 weeks)
-    final startDate = today.subtract(const Duration(days: 59));
+    // Start from habit creation date or 3 months back, whichever is earlier
+    final habitCreatedAt =
+        _habit?.createdAt ?? today.subtract(const Duration(days: 365));
+    final threeMonthsAgo = today.subtract(const Duration(days: 90));
+    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
+    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
 
     // Adjust to start from Monday of that week
     final adjustedStart =
@@ -734,58 +734,63 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         final isBeforeStart = date.isBefore(startDate);
 
         dayWidgets.add(
-          Container(
-            width: 36,
-            height: 36,
-            margin: const EdgeInsets.symmetric(vertical: 2),
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? habitColor
-                        : (isFuture || isBeforeStart)
-                            ? Colors.transparent
-                            : (isDark
-                                    ? Colors.grey.shade800
-                                    : Colors.grey.shade700)
-                                .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(6),
-                    border: isToday
-                        ? Border.all(color: habitColor, width: 2)
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      date.day.toString(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isCompleted
-                            ? Colors.white
-                            : isFuture
-                                ? theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.3)
-                                : theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.8),
-                        fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                        fontSize: 11,
+          GestureDetector(
+            onTap: (isCompleted && hasNotes)
+                ? () => _showNotesPopup(date, dateStr, habitColor, theme, isDark)
+                : null,
+            child: Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? habitColor
+                          : (isFuture || isBeforeStart)
+                              ? Colors.transparent
+                              : (isDark
+                                      ? Colors.grey.shade800
+                                      : Colors.grey.shade700)
+                                  .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(6),
+                      border: isToday
+                          ? Border.all(color: habitColor, width: 2)
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        date.day.toString(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: isCompleted
+                              ? Colors.white
+                              : isFuture
+                                  ? theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.3)
+                                  : theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.8),
+                          fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (hasNotes)
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.amber,
-                        shape: BoxShape.circle,
+                  if (hasNotes)
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.amber,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -816,14 +821,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       );
     }
 
+    // Use a scroll controller to scroll to the end (showing today)
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...weekColumns,
-          const SizedBox(width: 8),
           Column(children: dayLabels),
+          const SizedBox(width: 8),
+          ...weekColumns,
         ],
       ),
     );
@@ -1206,6 +1222,206 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     notesController.dispose();
   }
 
+  void _showEditableCalendarNotesPopup(
+    DateTime date,
+    String dateStr,
+    Color habitColor,
+    ThemeData theme,
+    bool isDark,
+    StateSetter setSheetState,
+  ) {
+    // Find the completion with notes for this date
+    final completion = _completions.firstWhere(
+      (c) => DateFormat('yyyy-MM-dd').format(c.date) == dateStr,
+      orElse: () => _completions.first,
+    );
+
+    if (completion.notes == null || completion.notes!.isEmpty) return;
+
+    // Parse notes - handle "QUESTION|||NOTES" format
+    String displayNotes = completion.notes!;
+    String? reflectiveQuestion;
+
+    if (displayNotes.contains('|||')) {
+      final parts = displayNotes.split('|||');
+      reflectiveQuestion = parts[0];
+      displayNotes = parts.length > 1 ? parts[1] : '';
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: habitColor.withValues(alpha: 0.1),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: habitColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.note_alt_rounded,
+                        color: habitColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reflection',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('EEEE, MMM d, yyyy').format(date),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (reflectiveQuestion != null &&
+                        reflectiveQuestion.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('💭', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reflectiveQuestion,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Text(
+                      displayNotes.isNotEmpty
+                          ? displayNotes
+                          : 'No additional notes',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.5,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              Navigator.of(dialogContext).pop();
+                              // Undo the completion
+                              await _toggleCompletion(date, onComplete: () {
+                                setSheetState(() {});
+                              });
+                            },
+                            icon: const Icon(Icons.undo, size: 18),
+                            label: const Text('Undo'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text('Close'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showEditCalendarSheet(ThemeData theme, bool isDark) {
     showModalBottomSheet(
       context: context,
@@ -1269,9 +1485,13 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isDark
-                            ? theme.colorScheme.surfaceContainerHighest
+                            ? theme.colorScheme.surface
                             : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              theme.colorScheme.outline.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: _buildEditableCalendarGrid(
                           theme, isDark, setSheetState),
@@ -1325,8 +1545,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Calculate 60 days worth of weeks
-    final startDate = today.subtract(const Duration(days: 59));
+    // Start from habit creation date or 3 months back, whichever is earlier
+    final habitCreatedAt =
+        _habit?.createdAt ?? today.subtract(const Duration(days: 365));
+    final threeMonthsAgo = today.subtract(const Duration(days: 90));
+    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
+    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
     final adjustedStart =
         startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
     final daysDiff = today.difference(adjustedStart).inDays;
@@ -1377,15 +1601,23 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
             date.month == today.month &&
             date.day == today.day;
         final isFuture = date.isAfter(today);
-        final isBeforeStart = date.isBefore(startDate);
+        final isBeforeHabitCreation = _habit?.createdAt != null &&
+            date.isBefore(DateTime(_habit!.createdAt.year,
+                _habit!.createdAt.month, _habit!.createdAt.day));
 
         dayWidgets.add(
           GestureDetector(
-            onTap: (!isFuture && !isBeforeStart)
+            onTap: (!isFuture)
                 ? () async {
-                    await _toggleCompletion(date, onComplete: () {
-                      setSheetState(() {});
-                    });
+                    // If completed and has notes, show notes popup first
+                    if (isCompleted && hasNotes) {
+                      _showEditableCalendarNotesPopup(date, dateStr, habitColor,
+                          theme, isDark, setSheetState);
+                    } else {
+                      await _toggleCompletion(date, onComplete: () {
+                        setSheetState(() {});
+                      });
+                    }
                   }
                 : null,
             child: Container(
@@ -1398,7 +1630,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? habitColor
-                          : (isFuture || isBeforeStart)
+                          : (isFuture || isBeforeHabitCreation)
                               ? Colors.transparent
                               : (isDark
                                       ? Colors.grey.shade800
@@ -1482,14 +1714,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       );
     }
 
+    // Use a scroll controller to scroll to the end (showing today)
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...weekColumns,
-          const SizedBox(width: 8),
           Column(children: dayLabels),
+          const SizedBox(width: 8),
+          ...weekColumns,
         ],
       ),
     );
@@ -1616,17 +1859,33 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
           ),
           child: Column(
             children: [
+              // Frequency and Reminder row
               Row(
                 children: [
                   Icon(
                     Icons.calendar_today_rounded,
-                    size: 20,
-                    color: theme.colorScheme.primary,
+                    size: 18,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Text(
                     frequencyText,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Icon(
+                    Icons.notifications_outlined,
+                    size: 18,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    habit.reminderTime != null
+                        ? _formatReminderTime(habit.reminderTime!)
+                        : 'Off',
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1677,6 +1936,19 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         ),
       ],
     );
+  }
+
+  String _formatReminderTime(String reminderTime) {
+    try {
+      final parts = reminderTime.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final period = hour >= 12 ? 'pm' : 'am';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      return '$displayHour:${minute.toString().padLeft(2, '0')} $period';
+    } catch (e) {
+      return reminderTime;
+    }
   }
 
   Widget _buildHighlightsSection(ThemeData theme, bool isDark) {

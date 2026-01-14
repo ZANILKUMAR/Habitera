@@ -214,10 +214,10 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
@@ -225,9 +225,12 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       contentPadding: const EdgeInsets.all(16),
                       hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                     maxLines: 3,
@@ -367,10 +370,10 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
@@ -378,9 +381,12 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       contentPadding: const EdgeInsets.all(16),
                       hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ),
                     maxLines: 3,
@@ -530,7 +536,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                   ),
                 ),
               ),
-              // Scrollable date headers - synced via listener
+              // Scrollable date headers - synced bidirectionally with body
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -542,17 +548,24 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                       ),
                     ),
                   ),
-                  child: SingleChildScrollView(
-                    controller: _horizontalScrollController,
-                    scrollDirection: Axis.horizontal,
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: SizedBox(
-                      width: scrollableWidth,
-                      child: Row(
-                        children: _dates.map((date) {
-                          final isToday = _isToday(date);
-                          return _buildDateCell(date, theme, isDark, isToday);
-                        }).toList(),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      // This prevents scroll notifications from bubbling up
+                      // The actual sync is handled by the scroll controller listener
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      controller: _horizontalScrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: SizedBox(
+                        width: scrollableWidth,
+                        child: Row(
+                          children: _dates.map((date) {
+                            final isToday = _isToday(date);
+                            return _buildDateCell(date, theme, isDark, isToday);
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -580,40 +593,47 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
 
   Widget _buildDateCell(
       DateTime date, ThemeData theme, bool isDark, bool isToday) {
-    return Container(
+    return SizedBox(
       width: _dateCellWidth,
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-      decoration: BoxDecoration(
-        color: isToday
-            ? theme.colorScheme.primary.withValues(alpha: 0.1)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            DateFormat('E').format(date).substring(0, 1),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: isToday
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 9,
-            ),
+      child: Center(
+        child: Container(
+          width: _dateCellWidth - 12, // Match completion cell inner width (44 - 6*2 = 32)
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            color: isToday
+                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
           ),
-          Text(
-            DateFormat('d').format(date),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: isToday
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface,
-              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 12,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                DateFormat('E').format(date).substring(0, 1),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isToday
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 9,
+                ),
+              ),
+              Text(
+                DateFormat('d').format(date),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: isToday
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -848,6 +868,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   bool _isSyncingNames = false;
   bool _isSyncingGrid = false;
   bool _isSyncingHorizontal = false;
+  bool _isSyncingFromHeader = false;
 
   @override
   void initState() {
@@ -856,8 +877,9 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     _namesVerticalController = ScrollController();
     _gridVerticalController = ScrollController();
 
-    // Sync horizontal scroll to header
+    // Sync horizontal scroll bidirectionally between header and body
     _gridHorizontalController.addListener(_onGridHorizontalScroll);
+    widget.horizontalController.addListener(_onHeaderHorizontalScroll);
     
     // Sync vertical scroll between names and grid
     _namesVerticalController.addListener(_onNamesVerticalScroll);
@@ -865,7 +887,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   }
 
   void _onGridHorizontalScroll() {
-    if (_isSyncingHorizontal) return;
+    if (_isSyncingHorizontal || _isSyncingFromHeader) return;
     _isSyncingHorizontal = true;
     
     if (widget.horizontalController.hasClients) {
@@ -873,6 +895,17 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     }
     
     _isSyncingHorizontal = false;
+  }
+
+  void _onHeaderHorizontalScroll() {
+    if (_isSyncingFromHeader || _isSyncingHorizontal) return;
+    _isSyncingFromHeader = true;
+    
+    if (_gridHorizontalController.hasClients) {
+      _gridHorizontalController.jumpTo(widget.horizontalController.offset);
+    }
+    
+    _isSyncingFromHeader = false;
   }
 
   void _onNamesVerticalScroll() {
@@ -900,6 +933,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   @override
   void dispose() {
     _gridHorizontalController.removeListener(_onGridHorizontalScroll);
+    widget.horizontalController.removeListener(_onHeaderHorizontalScroll);
     _namesVerticalController.removeListener(_onNamesVerticalScroll);
     _gridVerticalController.removeListener(_onGridVerticalScroll);
     _gridHorizontalController.dispose();

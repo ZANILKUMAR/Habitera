@@ -95,7 +95,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       setState(() {
         existingHabit = habit;
         titleController.text = habit.title;
-        
+
         // Parse description: format is "QUESTION|||NOTES" or just notes
         if (habit.description != null && habit.description!.contains('|||')) {
           final parts = habit.description!.split('|||');
@@ -104,7 +104,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
         } else {
           descriptionController.text = habit.description ?? '';
         }
-        
+
         frequency = habit.frequency.toString().split('.').last;
 
         // Load custom values based on frequency
@@ -218,7 +218,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       String? combinedDescription;
       final question = questionController.text.trim();
       final notes = descriptionController.text.trim();
-      
+
       if (question.isNotEmpty || notes.isNotEmpty) {
         if (question.isNotEmpty && notes.isNotEmpty) {
           combinedDescription = '$question|||$notes';
@@ -228,7 +228,7 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
           combinedDescription = notes;
         }
       }
-      
+
       final habit = Habit(
         id: existingHabit?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),
@@ -355,10 +355,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Center(
@@ -371,10 +371,14 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                     decoration: InputDecoration(
                       hintText: 'Habit name',
                       hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
                         fontWeight: FontWeight.w400,
                       ),
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -389,10 +393,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Center(
@@ -405,10 +409,14 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                     decoration: InputDecoration(
                       hintText: 'Add a reflective question (optional)',
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
                         fontStyle: FontStyle.italic,
                       ),
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -457,8 +465,9 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
   }
 
   Widget _buildIconColorRow(ThemeData theme) {
-    final selectedColorValue = Color(int.parse(selectedColor.replaceFirst('#', '0xff')));
-    
+    final selectedColorValue =
+        Color(int.parse(selectedColor.replaceFirst('#', '0xff')));
+
     return Row(
       children: [
         // Icon selector button
@@ -469,10 +478,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -506,10 +515,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -556,10 +565,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -657,12 +666,13 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               children: [
                 // Description - Matching style with other controls
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
@@ -670,9 +680,13 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                     decoration: InputDecoration(
                       hintText: 'Add a note (optional)',
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
                       ),
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -689,10 +703,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                   height: 56,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
+                    color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -768,15 +782,18 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Text(
               'Choose an icon',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 16),
             GridView.count(
@@ -795,11 +812,17 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Theme.of(context).colorScheme.primaryContainer
-                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          : Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected
-                          ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                          : null,
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2)
+                          : Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outline
+                                  .withValues(alpha: 0.3)),
                     ),
                     child: Center(
                       child: Text(icon, style: const TextStyle(fontSize: 28)),
@@ -833,15 +856,18 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Text(
               'Choose a color',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 16),
             GridView.count(
@@ -850,7 +876,8 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
               children: habitColors.map((color) {
-                final colorValue = Color(int.parse(color.replaceFirst('#', '0xff')));
+                final colorValue =
+                    Color(int.parse(color.replaceFirst('#', '0xff')));
                 final isSelected = selectedColor == color;
                 return GestureDetector(
                   onTap: () {
@@ -863,15 +890,22 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                       color: colorValue,
                       borderRadius: BorderRadius.circular(16),
                       border: isSelected
-                          ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              width: 3)
                           : null,
                       boxShadow: isSelected
-                          ? [BoxShadow(color: colorValue.withValues(alpha: 0.5), blurRadius: 12)]
+                          ? [
+                              BoxShadow(
+                                  color: colorValue.withValues(alpha: 0.5),
+                                  blurRadius: 12)
+                            ]
                           : null,
                     ),
                     child: isSelected
                         ? const Center(
-                            child: Icon(Icons.check, color: Colors.white, size: 28),
+                            child: Icon(Icons.check,
+                                color: Colors.white, size: 28),
                           )
                         : null,
                   ),
@@ -1188,12 +1222,15 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected
                   ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
+                  : Theme.of(context)
+                      .colorScheme
+                      .outline
+                      .withValues(alpha: 0.3),
               width: 2,
             ),
           ),
