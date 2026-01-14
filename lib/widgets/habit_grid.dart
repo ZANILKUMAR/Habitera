@@ -536,7 +536,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                   ),
                 ),
               ),
-              // Scrollable date headers - synced via listener
+              // Scrollable date headers - synced bidirectionally with body
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -548,17 +548,24 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                       ),
                     ),
                   ),
-                  child: SingleChildScrollView(
-                    controller: _horizontalScrollController,
-                    scrollDirection: Axis.horizontal,
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: SizedBox(
-                      width: scrollableWidth,
-                      child: Row(
-                        children: _dates.map((date) {
-                          final isToday = _isToday(date);
-                          return _buildDateCell(date, theme, isDark, isToday);
-                        }).toList(),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      // This prevents scroll notifications from bubbling up
+                      // The actual sync is handled by the scroll controller listener
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      controller: _horizontalScrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: SizedBox(
+                        width: scrollableWidth,
+                        child: Row(
+                          children: _dates.map((date) {
+                            final isToday = _isToday(date);
+                            return _buildDateCell(date, theme, isDark, isToday);
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -861,6 +868,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   bool _isSyncingNames = false;
   bool _isSyncingGrid = false;
   bool _isSyncingHorizontal = false;
+  bool _isSyncingFromHeader = false;
 
   @override
   void initState() {
@@ -869,8 +877,9 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     _namesVerticalController = ScrollController();
     _gridVerticalController = ScrollController();
 
-    // Sync horizontal scroll to header
+    // Sync horizontal scroll bidirectionally between header and body
     _gridHorizontalController.addListener(_onGridHorizontalScroll);
+    widget.horizontalController.addListener(_onHeaderHorizontalScroll);
     
     // Sync vertical scroll between names and grid
     _namesVerticalController.addListener(_onNamesVerticalScroll);
@@ -878,7 +887,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   }
 
   void _onGridHorizontalScroll() {
-    if (_isSyncingHorizontal) return;
+    if (_isSyncingHorizontal || _isSyncingFromHeader) return;
     _isSyncingHorizontal = true;
     
     if (widget.horizontalController.hasClients) {
@@ -886,6 +895,17 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     }
     
     _isSyncingHorizontal = false;
+  }
+
+  void _onHeaderHorizontalScroll() {
+    if (_isSyncingFromHeader || _isSyncingHorizontal) return;
+    _isSyncingFromHeader = true;
+    
+    if (_gridHorizontalController.hasClients) {
+      _gridHorizontalController.jumpTo(widget.horizontalController.offset);
+    }
+    
+    _isSyncingFromHeader = false;
   }
 
   void _onNamesVerticalScroll() {
@@ -913,6 +933,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   @override
   void dispose() {
     _gridHorizontalController.removeListener(_onGridHorizontalScroll);
+    widget.horizontalController.removeListener(_onHeaderHorizontalScroll);
     _namesVerticalController.removeListener(_onNamesVerticalScroll);
     _gridVerticalController.removeListener(_onGridVerticalScroll);
     _gridHorizontalController.dispose();

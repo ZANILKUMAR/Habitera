@@ -349,28 +349,24 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               _buildHeaderCard(habit, habitColor, theme, isDark),
               const SizedBox(height: 20),
 
-              // Schedule Section (moved to first)
+              // Schedule Section
               _buildFrequencySection(habit, theme, isDark),
               const SizedBox(height: 20),
 
-              // Calendar Section
-              _buildCalendarSection(habitColor, theme, isDark),
+              // Completion History Section
+              _buildHistoryStatsSection(habitColor, theme, isDark),
+              const SizedBox(height: 20),
+
+              // Calendar (Visual History)
+              _buildVisualHistory(theme, isDark),
               const SizedBox(height: 20),
 
               // Streak Stats
               _buildStreakSection(theme, isDark),
               const SizedBox(height: 20),
 
-              // History Stats Section
-              _buildHistoryStatsSection(habitColor, theme, isDark),
-              const SizedBox(height: 20),
-
-              // Frequency Chart Section
+              // Weekly Pattern (Frequency Chart)
               _buildFrequencyChartSection(habitColor, theme, isDark),
-              const SizedBox(height: 20),
-
-              // Visual History
-              _buildVisualHistory(theme, isDark),
               const SizedBox(height: 20),
 
               // Highlights Section
@@ -673,8 +669,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Calculate 60 days worth of weeks (approximately 9 weeks)
-    final startDate = today.subtract(const Duration(days: 59));
+    // Start from habit creation date or 3 months back, whichever is earlier
+    final habitCreatedAt =
+        _habit?.createdAt ?? today.subtract(const Duration(days: 365));
+    final threeMonthsAgo = today.subtract(const Duration(days: 90));
+    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
+    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
 
     // Adjust to start from Monday of that week
     final adjustedStart =
@@ -821,14 +821,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       );
     }
 
+    // Use a scroll controller to scroll to the end (showing today)
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...weekColumns,
-          const SizedBox(width: 8),
           Column(children: dayLabels),
+          const SizedBox(width: 8),
+          ...weekColumns,
         ],
       ),
     );
@@ -1534,12 +1545,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final habitColor = _parseColor(_habit?.color);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Calculate from habit creation date or 2 years back (whichever is more recent)
+    // Start from habit creation date or 3 months back, whichever is earlier
     final habitCreatedAt =
         _habit?.createdAt ?? today.subtract(const Duration(days: 365));
-    final twoYearsAgo = today.subtract(const Duration(days: 730));
-    final startDate =
-        habitCreatedAt.isAfter(twoYearsAgo) ? habitCreatedAt : twoYearsAgo;
+    final threeMonthsAgo = today.subtract(const Duration(days: 90));
+    final earliestDate = habitCreatedAt.isBefore(threeMonthsAgo) ? habitCreatedAt : threeMonthsAgo;
+    final startDate = DateTime(earliestDate.year, earliestDate.month, earliestDate.day);
     final adjustedStart =
         startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
     final daysDiff = today.difference(adjustedStart).inDays;
@@ -1703,14 +1714,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       );
     }
 
+    // Use a scroll controller to scroll to the end (showing today)
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...weekColumns,
-          const SizedBox(width: 8),
           Column(children: dayLabels),
+          const SizedBox(width: 8),
+          ...weekColumns,
         ],
       ),
     );

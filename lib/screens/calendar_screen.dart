@@ -583,14 +583,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       );
     }
 
+    // Use a scroll controller to scroll to the end (showing current month)
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...weekColumns,
-          const SizedBox(width: 8),
           Column(children: dayLabels),
+          const SizedBox(width: 8),
+          ...weekColumns,
         ],
       ),
     );

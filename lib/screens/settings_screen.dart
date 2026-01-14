@@ -186,14 +186,14 @@ class SettingsScreen extends ConsumerWidget {
                     // Could launch email app
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.language_outlined),
-                  title: const Text('Website'),
-                  subtitle: const Text('www.aktechsource.com'),
-                  onTap: () {
-                    // Could launch browser
-                  },
-                ),
+                // ListTile(
+                //   leading: const Icon(Icons.language_outlined),
+                //   title: const Text('Website'),
+                //   subtitle: const Text('www.aktechsource.com'),
+                //   onTap: () {
+                //     // Could launch browser
+                //   },
+                // ),
                 ListTile(
                   leading: const Icon(Icons.feedback_outlined),
                   title: const Text('Send Feedback'),
