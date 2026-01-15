@@ -400,7 +400,7 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.max,
         ),
-        iOS: const DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:

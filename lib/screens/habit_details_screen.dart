@@ -20,6 +20,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   Habit? _habit;
   List<Completion> _completions = [];
   bool _isLoading = true;
+  bool _notePromptOnTap = false; // Setting for tap behavior
 
   // Stats
   int _currentStreak = 0;
@@ -36,7 +37,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   List<int> _weeklyFrequency = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
 
   // Calendar state
-  DateTime _selectedMonth = DateTime.now();
   Set<DateTime> _completionDates = {};
   Set<String> _completionDatesWithNotes =
       {}; // Dates with notes in 'yyyy-MM-dd' format
@@ -45,6 +45,20 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _db.getSettings();
+      if (mounted) {
+        setState(() {
+          _notePromptOnTap = settings.notePromptOnTap;
+        });
+      }
+    } catch (e) {
+      // Use default if error
+    }
   }
 
   Future<void> _loadData() async {
@@ -842,8 +856,41 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     );
   }
 
-  Future<void> _toggleCompletion(DateTime date,
-      {VoidCallback? onComplete}) async {
+  /// Handles tap on a completion cell based on notePromptOnTap setting
+  Future<void> _onCompletionTap(DateTime date, {VoidCallback? onComplete}) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final existingCompletion = _completions.cast<Completion?>().firstWhere(
+          (c) =>
+              c != null && DateFormat('yyyy-MM-dd').format(c.date) == dateStr,
+          orElse: () => null,
+        );
+    final isCompleted = existingCompletion != null;
+    final hasNotes = existingCompletion?.notes != null && 
+                     existingCompletion!.notes!.isNotEmpty;
+
+    if (isCompleted) {
+      // Unchecking behavior
+      if (hasNotes) {
+        // Has notes - show options sheet to review before unchecking
+        await _showCompletionOptionsSheet(date, existingCompletion, onComplete);
+      } else {
+        // No notes - quick undo without popup
+        await _quickUndo(date, onComplete);
+      }
+    } else {
+      // Checking behavior depends on setting
+      if (_notePromptOnTap) {
+        // Tap opens notes popup
+        await _showAddCompletionSheet(date, onComplete);
+      } else {
+        // Tap marks immediately
+        await _quickComplete(date, onComplete);
+      }
+    }
+  }
+
+  /// Handles long-press on a completion cell based on notePromptOnTap setting
+  Future<void> _onCompletionLongPress(DateTime date, {VoidCallback? onComplete}) async {
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final existingCompletion = _completions.cast<Completion?>().firstWhere(
           (c) =>
@@ -853,11 +900,63 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     final isCompleted = existingCompletion != null;
 
     if (isCompleted) {
-      // Show options to edit notes or undo
+      // Always show options sheet on long-press for editing notes
       await _showCompletionOptionsSheet(date, existingCompletion, onComplete);
     } else {
-      // Show popup to add completion with optional notes
-      await _showAddCompletionSheet(date, onComplete);
+      // Opposite of tap behavior
+      if (_notePromptOnTap) {
+        // Long-press marks immediately
+        await _quickComplete(date, onComplete);
+      } else {
+        // Long-press opens notes popup
+        await _showAddCompletionSheet(date, onComplete);
+      }
+    }
+  }
+
+  /// Quick complete without showing notes popup
+  Future<void> _quickComplete(DateTime date, VoidCallback? onComplete) async {
+    try {
+      final completion = await _db.recordCompletion(_habit!.id, date);
+      
+      setState(() {
+        _completions.add(completion);
+        _completionDates.add(DateTime(date.year, date.month, date.day));
+      });
+
+      ref.invalidate(dailyStatsProvider);
+      ref.invalidate(heatmapProvider);
+      ref.invalidate(completionStateProvider(_habit!.id));
+      
+      onComplete?.call();
+      _calculateStats(_habit!, _completions);
+    } catch (e) {
+      // Error handling
+    }
+  }
+
+  /// Quick undo completion without showing popup
+  Future<void> _quickUndo(DateTime date, VoidCallback? onComplete) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    
+    try {
+      await _db.undoCompletion(_habit!.id, date);
+      
+      setState(() {
+        _completions.removeWhere(
+            (c) => DateFormat('yyyy-MM-dd').format(c.date) == dateStr);
+        _completionDates.remove(DateTime(date.year, date.month, date.day));
+        _completionDatesWithNotes.remove(dateStr);
+      });
+
+      ref.invalidate(dailyStatsProvider);
+      ref.invalidate(heatmapProvider);
+      ref.invalidate(completionStateProvider(_habit!.id));
+      
+      onComplete?.call();
+      _calculateStats(_habit!, _completions);
+    } catch (e) {
+      // Error handling
     }
   }
 
@@ -922,7 +1021,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                 Text(
                   DateFormat('EEEE, MMMM d').format(date),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 // Show reflective question if exists (stored as "QUESTION|||NOTES")
@@ -953,7 +1052,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primaryContainer
-                              .withOpacity(0.3),
+                              .withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -970,7 +1069,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                                 reflectiveQuestion,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurface
-                                      .withOpacity(0.8),
+                                      .withValues(alpha: 0.8),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -983,22 +1082,27 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                 }),
                 const SizedBox(height: 20),
                 Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
                     controller: notesController,
+                    style: theme.textTheme.bodyMedium,
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.all(16),
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     maxLines: 3,
                     minLines: 1,
@@ -1124,27 +1228,32 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                 Text(
                   DateFormat('EEEE, MMMM d').format(date),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                   ),
                   child: TextField(
                     controller: notesController,
+                    style: theme.textTheme.bodyMedium,
                     decoration: InputDecoration(
                       hintText: 'Add notes (optional)',
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.all(16),
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     maxLines: 3,
                     minLines: 1,
@@ -1217,206 +1326,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     }
 
     notesController.dispose();
-  }
-
-  void _showEditableCalendarNotesPopup(
-    DateTime date,
-    String dateStr,
-    Color habitColor,
-    ThemeData theme,
-    bool isDark,
-    StateSetter setSheetState,
-  ) {
-    // Find the completion with notes for this date
-    final completion = _completions.firstWhere(
-      (c) => DateFormat('yyyy-MM-dd').format(c.date) == dateStr,
-      orElse: () => _completions.first,
-    );
-
-    if (completion.notes == null || completion.notes!.isEmpty) return;
-
-    // Parse notes - handle "QUESTION|||NOTES" format
-    String displayNotes = completion.notes!;
-    String? reflectiveQuestion;
-
-    if (displayNotes.contains('|||')) {
-      final parts = displayNotes.split('|||');
-      reflectiveQuestion = parts[0];
-      displayNotes = parts.length > 1 ? parts[1] : '';
-    }
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 340),
-          decoration: BoxDecoration(
-            color: isDark ? theme.colorScheme.surface : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: habitColor.withValues(alpha: 0.1),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: habitColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.note_alt_rounded,
-                        color: habitColor,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Note',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            DateFormat('EEEE, MMM d, yyyy').format(date),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (reflectiveQuestion != null &&
-                        reflectiveQuestion.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('💭', style: TextStyle(fontSize: 16)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                reflectiveQuestion,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontStyle: FontStyle.italic,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.7),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Text(
-                      displayNotes.isNotEmpty
-                          ? displayNotes
-                          : 'No additional notes',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 1.5,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              Navigator.of(dialogContext).pop();
-                              // Undo the completion
-                              await _toggleCompletion(date, onComplete: () {
-                                setSheetState(() {});
-                              });
-                            },
-                            icon: const Icon(Icons.undo, size: 18),
-                            label: const Text('Undo'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: const Text('Close'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showEditCalendarSheet(ThemeData theme, bool isDark) {
@@ -1603,15 +1512,16 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
           GestureDetector(
             onTap: (!isFuture)
                 ? () async {
-                    // If completed and has notes, show notes popup first
-                    if (isCompleted && hasNotes) {
-                      _showEditableCalendarNotesPopup(date, dateStr, habitColor,
-                          theme, isDark, setSheetState);
-                    } else {
-                      await _toggleCompletion(date, onComplete: () {
-                        setSheetState(() {});
-                      });
-                    }
+                    await _onCompletionTap(date, onComplete: () {
+                      setSheetState(() {});
+                    });
+                  }
+                : null,
+            onLongPress: (!isFuture)
+                ? () async {
+                    await _onCompletionLongPress(date, onComplete: () {
+                      setSheetState(() {});
+                    });
                   }
                 : null,
             child: Container(
@@ -2262,201 +2172,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  // Calendar Section with colored completion dates
-  Widget _buildCalendarSection(Color habitColor, ThemeData theme, bool isDark) {
-    final now = DateTime.now();
-    final firstDayOfMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final lastDayOfMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-    final daysInMonth = lastDayOfMonth.day;
-    final firstWeekday = (firstDayOfMonth.weekday - 1) % 7; // 0 = Monday
-
-    final weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-    // Count completions in selected month
-    final monthCompletions = _completionDates
-        .where((d) =>
-            d.year == _selectedMonth.year && d.month == _selectedMonth.month)
-        .length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Calendar',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? theme.colorScheme.surface : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Column(
-            children: [
-              // Month navigation
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    onPressed: () {
-                      setState(() {
-                        _selectedMonth = DateTime(
-                          _selectedMonth.year,
-                          _selectedMonth.month - 1,
-                        );
-                      });
-                    },
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        DateFormat('MMMM yyyy').format(_selectedMonth),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '$monthCompletions completions',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: habitColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded),
-                    onPressed:
-                        _selectedMonth.isBefore(DateTime(now.year, now.month))
-                            ? () {
-                                setState(() {
-                                  _selectedMonth = DateTime(
-                                    _selectedMonth.year,
-                                    _selectedMonth.month + 1,
-                                  );
-                                });
-                              }
-                            : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Weekday headers
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: weekDays
-                    .map((day) => SizedBox(
-                          width: 36,
-                          child: Center(
-                            child: Text(
-                              day,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                          ),
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 8),
-              // Calendar grid
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: (firstWeekday + daysInMonth + 6) ~/ 7 * 7,
-                itemBuilder: (context, index) {
-                  final dayNumber = index - firstWeekday + 1;
-
-                  if (dayNumber < 1 || dayNumber > daysInMonth) {
-                    return const SizedBox();
-                  }
-
-                  final date = DateTime(
-                      _selectedMonth.year, _selectedMonth.month, dayNumber);
-                  final dateStr = DateFormat('yyyy-MM-dd').format(date);
-                  final isCompleted = _completionDates.contains(date);
-                  final hasNotes = _completionDatesWithNotes.contains(dateStr);
-                  final isToday = date.year == now.year &&
-                      date.month == now.month &&
-                      date.day == now.day;
-                  final isFuture = date.isAfter(now);
-
-                  return GestureDetector(
-                    onTap: hasNotes
-                        ? () => _showNotesPopup(
-                            date, dateStr, habitColor, theme, isDark)
-                        : null,
-                    child: Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: isCompleted
-                                ? habitColor
-                                : isToday
-                                    ? habitColor.withValues(alpha: 0.2)
-                                    : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: isToday && !isCompleted
-                                ? Border.all(color: habitColor, width: 2)
-                                : null,
-                          ),
-                          child: Center(
-                            child: Text(
-                              dayNumber.toString(),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: isToday
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isCompleted
-                                    ? Colors.white
-                                    : isFuture
-                                        ? theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.3)
-                                        : theme.colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (hasNotes)
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.amber,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

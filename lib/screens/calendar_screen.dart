@@ -13,6 +13,25 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _selectedMonth = DateTime.now();
+  String _chartFilter = 'weekly'; // 'weekly', 'monthly', 'quarterly', 'yearly'
+  String _habitChartFilter = 'week'; // 'week', 'month', 'quarter', 'year', 'lifetime'
+  final ScrollController _historyChartScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _historyChartScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollHistoryChartToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_historyChartScrollController.hasClients) {
+        _historyChartScrollController.jumpTo(
+          _historyChartScrollController.position.maxScrollExtent,
+        );
+      }
+    });
+  }
 
   Color _getHeatmapColor(int percentage, bool isDark) {
     if (percentage == 0) {
@@ -91,8 +110,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         // Monthly calendar
                         _buildMonthlyCalendar(heatmap, theme, isDark),
 
-                        // Activity heatmap
-                        _buildHeatmapSection(heatmap, theme, isDark),
+                        // History Chart
+                        _buildHistoryChart(heatmap, theme, isDark),
+
+                        // Habit Comparison Chart
+                        _buildHabitComparisonChart(habits, theme, isDark),
 
                         const SizedBox(height: 32),
                       ],
@@ -230,6 +252,320 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  // ==================== History Chart Section ====================
+
+  Widget _buildHistoryChart(
+      Map<String, int> heatmap, ThemeData theme, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with title and filter chips
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'History',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Filter chips
+          _buildChartFilters(theme, isDark),
+          const SizedBox(height: 20),
+          // Bar chart
+          _buildBarChart(heatmap, theme, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartFilters(ThemeData theme, bool isDark) {
+    final filters = [
+      ('weekly', 'Week'),
+      ('monthly', 'Month'),
+      ('quarterly', 'Quarter'),
+      ('yearly', 'Year'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = _chartFilter == filter.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _chartFilter = filter.$1;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.3 : 0.15)
+                      : isDark
+                          ? Colors.grey.shade800.withValues(alpha: 0.5)
+                          : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                        : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Text(
+                  filter.$2,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<_ChartData> _getChartData(Map<String, int> heatmap) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final data = <_ChartData>[];
+
+    switch (_chartFilter) {
+      case 'weekly':
+        // Last 260 weeks (5 years) - count days with at least one habit completed
+        // Start from the beginning of the current week (Monday)
+        final currentWeekStart = today.subtract(Duration(days: today.weekday - 1));
+        
+        for (int i = 259; i >= 0; i--) {
+          final weekStart = currentWeekStart.subtract(Duration(days: i * 7));
+          int activeDays = 0;
+          
+          for (int d = 0; d < 7; d++) {
+            final date = weekStart.add(Duration(days: d));
+            if (date.isAfter(today)) continue;
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            // Count day as active if at least one habit was completed (heatmap > 0)
+            if ((heatmap[dateStr] ?? 0) > 0) activeDays++;
+          }
+          
+          // Show week start date (e.g., "Jan 13") for human-friendly labels
+          final label = i == 0 ? 'Now' : DateFormat('MMM d').format(weekStart);
+          data.add(_ChartData(label: label, value: activeDays, isCurrentPeriod: i == 0));
+        }
+        break;
+
+      case 'monthly':
+        // Last 60 months (5 years) - count days with at least one habit completed
+        for (int i = 59; i >= 0; i--) {
+          final month = DateTime(now.year, now.month - i, 1);
+          final monthEnd = DateTime(month.year, month.month + 1, 0);
+          int activeDays = 0;
+          
+          for (int d = 1; d <= monthEnd.day; d++) {
+            final date = DateTime(month.year, month.month, d);
+            if (date.isAfter(today)) continue;
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            // Count day as active if at least one habit was completed (heatmap > 0)
+            if ((heatmap[dateStr] ?? 0) > 0) activeDays++;
+          }
+          
+          final label = DateFormat('MMM').format(month);
+          data.add(_ChartData(label: label, value: activeDays, isCurrentPeriod: i == 0));
+        }
+        break;
+
+      case 'quarterly':
+        // Last 20 quarters (5 years) - count days with at least one habit completed
+        for (int i = 19; i >= 0; i--) {
+          final quarterStartMonth = ((now.month - 1) ~/ 3) * 3 + 1 - (i * 3);
+          var year = now.year;
+          var adjustedMonth = quarterStartMonth;
+          
+          while (adjustedMonth <= 0) {
+            adjustedMonth += 12;
+            year--;
+          }
+          
+          final quarterStart = DateTime(year, adjustedMonth, 1);
+          final quarterEnd = DateTime(year, adjustedMonth + 3, 0);
+          int activeDays = 0;
+          
+          var date = quarterStart;
+          while (!date.isAfter(quarterEnd) && !date.isAfter(today)) {
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            // Count day as active if at least one habit was completed (heatmap > 0)
+            if ((heatmap[dateStr] ?? 0) > 0) activeDays++;
+            date = date.add(const Duration(days: 1));
+          }
+          
+          // Use month range labels for all quarters (e.g., "Jan-Mar")
+          final endMonth = DateTime(year, adjustedMonth + 2, 1);
+          final label = '${DateFormat('MMM').format(quarterStart)}-${DateFormat('MMM').format(endMonth)}';
+          data.add(_ChartData(label: label, value: activeDays, isCurrentPeriod: i == 0));
+        }
+        break;
+
+      case 'yearly':
+        // Last 5 years - count days with at least one habit completed
+        for (int i = 4; i >= 0; i--) {
+          final year = now.year - i;
+          final yearStart = DateTime(year, 1, 1);
+          final yearEnd = DateTime(year, 12, 31);
+          int activeDays = 0;
+          
+          var date = yearStart;
+          while (!date.isAfter(yearEnd) && !date.isAfter(today)) {
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            // Count day as active if at least one habit was completed (heatmap > 0)
+            if ((heatmap[dateStr] ?? 0) > 0) activeDays++;
+            date = date.add(const Duration(days: 1));
+          }
+          
+          final label = year.toString();
+          data.add(_ChartData(label: label, value: activeDays, isCurrentPeriod: i == 0));
+        }
+        break;
+    }
+
+    return data;
+  }
+
+  Widget _buildBarChart(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+    final data = _getChartData(heatmap);
+    final maxValue = data.isEmpty ? 100 : data.map((d) => d.value).reduce((a, b) => a > b ? a : b);
+    final normalizedMax = maxValue == 0 ? 100 : maxValue;
+
+    // Soft, calm colors for the bars
+    final barColor = isDark
+        ? const Color(0xFF81C784) // Soft green for dark mode
+        : const Color(0xFF66BB6A); // Slightly darker for light mode
+    final currentBarColor = isDark
+        ? const Color(0xFF4FC3F7) // Soft blue accent for current period
+        : const Color(0xFF42A5F5);
+
+    // Scroll to show current period (end of list) after build
+    _scrollHistoryChartToEnd();
+
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        controller: _historyChartScrollController,
+        scrollDirection: Axis.horizontal,
+        reverse: false,
+        itemCount: data.length,
+        itemBuilder: (context, index) {
+          final item = data[index];
+          final barHeight = (item.value / normalizedMax) * 100;
+          final isLast = index == data.length - 1;
+
+          return Container(
+            width: 52,
+            padding: EdgeInsets.only(
+              left: index == 0 ? 0 : 4,
+              right: isLast ? 0 : 4,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Value label (only show if > 0) - shows number of active days
+                if (item.value > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '${item.value}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                // Bar
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  height: barHeight.clamp(4.0, 100.0),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: item.isCurrentPeriod
+                            ? [
+                                currentBarColor.withValues(alpha: 0.9),
+                                currentBarColor.withValues(alpha: 0.6),
+                              ]
+                            : [
+                                barColor.withValues(alpha: 0.8),
+                                barColor.withValues(alpha: 0.5),
+                              ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: item.value > 0
+                          ? [
+                              BoxShadow(
+                                color: (item.isCurrentPeriod ? currentBarColor : barColor)
+                                    .withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Label
+                Text(
+                  item.label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: item.isCurrentPeriod
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: item.isCurrentPeriod ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -387,11 +723,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return Column(children: rows);
   }
 
-  Widget _buildHeatmapSection(
-      Map<String, int> heatmap, ThemeData theme, bool isDark) {
+  // ===== HABIT COMPARISON CHART =====
+
+  Widget _buildHabitComparisonChart(List<dynamic> habits, ThemeData theme, bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -411,199 +748,293 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header with filter dropdown
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '3 Month Overview',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // Title and subtitle
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Habit Overview',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Days completed per habit',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
               ),
-              _buildLegend(theme, isDark),
+              // Filter dropdown
+              _buildHabitChartFilters(theme, isDark),
             ],
           ),
-          const SizedBox(height: 16),
-          _build3MonthCalendarGrid(heatmap, isDark, theme),
+          const SizedBox(height: 20),
+          // Bar chart
+          _buildHabitComparisonBarChartWithProvider(habits, theme, isDark),
         ],
       ),
     );
   }
 
-  Widget _buildLegend(ThemeData theme, bool isDark) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Less',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
-        ),
-        const SizedBox(width: 4),
-        _legendBox(isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-        _legendBox(const Color(0xFFE8F5E9)),
-        _legendBox(const Color(0xFFA5D6A7)),
-        _legendBox(const Color(0xFF66BB6A)),
-        _legendBox(const Color(0xFF43A047)),
-        const SizedBox(width: 4),
-        Text(
-          'More',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _legendBox(Color color) {
-    return Container(
-      width: 12,
-      height: 12,
-      margin: const EdgeInsets.symmetric(horizontal: 1),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-
-  Widget _build3MonthCalendarGrid(Map<String, int> heatmap, bool isDark, ThemeData theme) {
+  DateTime _getHabitChartStartDate() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    // Calculate ~90 days back from end of current week
-    final endOfWeek = today.add(Duration(days: 7 - today.weekday));
-    final startDate = endOfWeek.subtract(const Duration(days: 90));
-    // Adjust start to Monday of that week
-    final adjustedStart = startDate.subtract(Duration(days: (startDate.weekday - 1)));
-    final daysDiff = endOfWeek.difference(adjustedStart).inDays + 1;
-    final numWeeks = (daysDiff / 7).ceil();
     
-    // Find unique months to display
-    Map<int, String> monthHeaders = {};
-    for (int week = 0; week < numWeeks; week++) {
-      final weekStart = adjustedStart.add(Duration(days: week * 7));
-      if (week == 0 || weekStart.month != adjustedStart.add(Duration(days: (week - 1) * 7)).month) {
-        monthHeaders[week] = DateFormat('MMM').format(weekStart);
-        if (weekStart.month == 1 || week == 0) {
-          monthHeaders[week] = '${DateFormat('MMM').format(weekStart)} ${weekStart.year}';
-        }
-      }
+    switch (_habitChartFilter) {
+      case 'week':
+        // Last 7 days (including today)
+        return today.subtract(const Duration(days: 6));
+      case 'month':
+        return DateTime(now.year, now.month, 1);
+      case 'quarter':
+        final quarterStartMonth = ((now.month - 1) ~/ 3) * 3 + 1;
+        return DateTime(now.year, quarterStartMonth, 1);
+      case 'year':
+        return DateTime(now.year, 1, 1);
+      case 'lifetime':
+      default:
+        return DateTime(2000, 1, 1);
     }
-    
-    List<Widget> weekColumns = [];
-    
-    for (int week = 0; week < numWeeks; week++) {
-      List<Widget> dayWidgets = [];
-      
-      // Month header
-      dayWidgets.add(
-        SizedBox(
-          height: 20,
-          child: monthHeaders.containsKey(week)
-              ? Text(
-                  monthHeaders[week]!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 10,
-                  ),
-                )
-              : null,
-        ),
+  }
+
+  Widget _buildHabitComparisonBarChartWithProvider(List<dynamic> habits, ThemeData theme, bool isDark) {
+    if (habits.isEmpty) {
+      return const SizedBox(
+        height: 100,
+        child: Center(child: Text('No habits to display')),
       );
-      
-      for (int day = 0; day < 7; day++) {
-        final date = adjustedStart.add(Duration(days: week * 7 + day));
-        final dateStr = DateFormat('yyyy-MM-dd').format(date);
-        final percentage = heatmap[dateStr] ?? 0;
-        final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
-        final isFuture = date.isAfter(today);
+    }
+
+    final startDate = _getHabitChartStartDate();
+    final completionCountsAsync = ref.watch(habitCompletionCountsProvider(startDate));
+
+    return completionCountsAsync.when(
+      loading: () => const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => SizedBox(
+        height: 100,
+        child: Center(child: Text('Error: $error')),
+      ),
+      data: (completionCounts) {
+        final data = habits.map((habit) => _HabitChartData(
+          name: habit.title,
+          emoji: habit.icon ?? '📌',
+          value: completionCounts[habit.id] ?? 0,
+        )).toList();
         
-        dayWidgets.add(
-          Tooltip(
-            message: '${DateFormat('MMM d, yyyy').format(date)}: $percentage%',
-            child: Container(
-              width: 36,
-              height: 36,
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              decoration: BoxDecoration(
-                color: isFuture
-                    ? Colors.transparent
-                    : _getHeatmapColor(percentage, isDark),
-                borderRadius: BorderRadius.circular(6),
-                border: isToday
-                    ? Border.all(color: theme.colorScheme.primary, width: 2)
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  date.day.toString(),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isFuture
-                        ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                        : percentage >= 50
-                            ? Colors.white
-                            : theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                    fontSize: 11,
-                  ),
+        // Sort by value descending
+        data.sort((a, b) => b.value.compareTo(a.value));
+        
+        if (data.isEmpty) {
+          return const SizedBox(
+            height: 100,
+            child: Center(child: Text('No data available')),
+          );
+        }
+
+        final maxValue = data.map((d) => d.value).reduce((a, b) => a > b ? a : b);
+        final normalizedMax = maxValue > 0 ? maxValue : 1;
+
+        // Soft, calm color palette for bars
+        final barColors = [
+          const Color(0xFF7986CB), // Indigo
+          const Color(0xFF4DB6AC), // Teal
+          const Color(0xFFFFB74D), // Orange
+          const Color(0xFF81C784), // Green
+          const Color(0xFFBA68C8), // Purple
+          const Color(0xFF64B5F6), // Blue
+          const Color(0xFFE57373), // Red
+          const Color(0xFFA1887F), // Brown
+          const Color(0xFF90A4AE), // Blue Grey
+          const Color(0xFFDCE775), // Lime
+        ];
+
+        return SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final item = data[index];
+              final barColor = barColors[index % barColors.length];
+              final barHeight = (item.value / normalizedMax) * 100;
+
+              return Container(
+                width: 60,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // Value label
+                    if (item.value > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '${item.value}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    // Bar
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      height: barHeight.clamp(4.0, 100.0),
+                      width: 32,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            barColor.withValues(alpha: 0.9),
+                            barColor.withValues(alpha: 0.6),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: item.value > 0
+                            ? [
+                                BoxShadow(
+                                  color: barColor.withValues(alpha: 0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Habit emoji
+                    Text(
+                      item.emoji,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(height: 2),
+                    // Habit name (truncated)
+                    SizedBox(
+                      width: 56,
+                      child: Text(
+                        item.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 9,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         );
-      }
-      
-      weekColumns.add(Column(children: dayWidgets));
-    }
-    
-    // Day name labels column
-    List<Widget> dayLabels = [
-      const SizedBox(height: 20),
+      },
+    );
+  }
+
+  Widget _buildHabitChartFilters(ThemeData theme, bool isDark) {
+    final filters = [
+      ('week', 'Week'),
+      ('month', 'Month'),
+      ('quarter', 'Quarter'),
+      ('year', 'Year'),
+      ('lifetime', 'All Time'),
     ];
-    for (final dayName in dayNames) {
-      dayLabels.add(
-        Container(
-          height: 36,
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          alignment: Alignment.center,
-          child: Text(
-            dayName,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              fontWeight: FontWeight.w500,
-              fontSize: 10,
-            ),
-          ),
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.grey.shade800.withValues(alpha: 0.5)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          width: 1,
         ),
-      );
-    }
-
-    // Use a scroll controller to scroll to the end (showing current month)
-    final scrollController = ScrollController();
-    
-    // Schedule scroll to end after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
-        scrollController.jumpTo(scrollController.position.maxScrollExtent);
-      }
-    });
-
-    return SingleChildScrollView(
-      controller: scrollController,
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(children: dayLabels),
-          const SizedBox(width: 8),
-          ...weekColumns,
-        ],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _habitChartFilter,
+          isDense: true,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+          dropdownColor: isDark ? theme.colorScheme.surface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          items: filters.map((filter) {
+            return DropdownMenuItem<String>(
+              value: filter.$1,
+              child: Text(
+                filter.$2,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: _habitChartFilter == filter.$1
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                  fontWeight: _habitChartFilter == filter.$1
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            if (value != null) {
+              setState(() {
+                _habitChartFilter = value;
+              });
+              // Invalidate the provider to fetch fresh data for new date range
+              ref.invalidate(habitCompletionCountsProvider);
+            }
+          },
+        ),
       ),
     );
   }
+}
+
+/// Helper class for habit comparison chart data
+class _HabitChartData {
+  final String name;
+  final String emoji;
+  final int value;
+
+  _HabitChartData({
+    required this.name,
+    required this.emoji,
+    required this.value,
+  });
+}
+
+/// Helper class for chart data
+class _ChartData {
+  final String label;
+  final int value;
+  final bool isCurrentPeriod;
+
+  _ChartData({
+    required this.label,
+    required this.value,
+    this.isCurrentPeriod = false,
+  });
 }
