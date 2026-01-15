@@ -160,6 +160,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
       ref.invalidate(dailyStatsProvider);
       ref.invalidate(heatmapProvider);
       ref.invalidate(completionStateProvider(habitId));
+      ref.invalidate(habitCompletionCountsProvider);
     } catch (e) {
       // Rollback on error
       setState(() {
@@ -182,6 +183,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
       ref.invalidate(dailyStatsProvider);
       ref.invalidate(heatmapProvider);
       ref.invalidate(completionStateProvider(habit.id));
+      ref.invalidate(habitCompletionCountsProvider);
     } catch (e) {
       // Rollback on error
       setState(() {
@@ -387,6 +389,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
         ref.invalidate(dailyStatsProvider);
         ref.invalidate(heatmapProvider);
         ref.invalidate(completionStateProvider(habit.id));
+        ref.invalidate(habitCompletionCountsProvider);
       } catch (e) {
         setState(() {
           _completions[habit.id]!.remove(dateStr);
@@ -541,6 +544,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
         ref.invalidate(dailyStatsProvider);
         ref.invalidate(heatmapProvider);
         ref.invalidate(completionStateProvider(habitId));
+        ref.invalidate(habitCompletionCountsProvider);
       } catch (e) {
         setState(() {
           _completions[habitId]!.add(dateStr);

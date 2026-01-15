@@ -383,6 +383,10 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               _buildFrequencyChartSection(habitColor, theme, isDark),
               const SizedBox(height: 20),
 
+              // Frequency Dot Matrix Chart
+              _buildFrequencyDotMatrixSection(habitColor, theme, isDark),
+              const SizedBox(height: 20),
+
               // Highlights Section
               _buildHighlightsSection(theme, isDark),
               const SizedBox(height: 32),
@@ -680,7 +684,8 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
         .toSet();
 
-    final habitColor = _parseColor(_habit?.color);
+    final baseHabitColor = _parseColor(_habit?.color);
+    final habitColor = _enhanceColorForDarkMode(baseHabitColor, isDark);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     // Show 2 years of history (no restriction) - allows backfilling completions
@@ -927,6 +932,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       ref.invalidate(dailyStatsProvider);
       ref.invalidate(heatmapProvider);
       ref.invalidate(completionStateProvider(_habit!.id));
+      ref.invalidate(habitCompletionCountsProvider);
       
       onComplete?.call();
       _calculateStats(_habit!, _completions);
@@ -952,6 +958,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       ref.invalidate(dailyStatsProvider);
       ref.invalidate(heatmapProvider);
       ref.invalidate(completionStateProvider(_habit!.id));
+      ref.invalidate(habitCompletionCountsProvider);
       
       onComplete?.call();
       _calculateStats(_habit!, _completions);
@@ -1156,6 +1163,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         ref.invalidate(habitsProvider);
         ref.invalidate(dailyStatsProvider);
         ref.invalidate(heatmapProvider);
+        ref.invalidate(habitCompletionCountsProvider);
         onComplete?.call();
       } catch (e) {
         if (mounted) {
@@ -1306,6 +1314,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         ref.invalidate(habitsProvider);
         ref.invalidate(dailyStatsProvider);
         ref.invalidate(heatmapProvider);
+        ref.invalidate(habitCompletionCountsProvider);
         onComplete?.call();
       } catch (e) {
         if (mounted) {
@@ -1329,12 +1338,25 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   }
 
   void _showEditCalendarSheet(ThemeData theme, bool isDark) {
+    final scrollController = ScrollController();
+    bool hasScrolledToEnd = false;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
+          // Only scroll to end on initial build
+          if (!hasScrolledToEnd) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (scrollController.hasClients) {
+                scrollController.jumpTo(scrollController.position.maxScrollExtent);
+                hasScrolledToEnd = true;
+              }
+            });
+          }
+          
           return Container(
             height: MediaQuery.of(context).size.height * 0.7,
             decoration: BoxDecoration(
@@ -1400,7 +1422,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                         ),
                       ),
                       child: _buildEditableCalendarGrid(
-                          theme, isDark, setSheetState),
+                          theme, isDark, setSheetState, scrollController),
                     ),
                   ),
                 ),
@@ -1435,7 +1457,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   }
 
   Widget _buildEditableCalendarGrid(
-      ThemeData theme, bool isDark, StateSetter setSheetState) {
+      ThemeData theme, bool isDark, StateSetter setSheetState, ScrollController scrollController) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final completionDates = _completions
@@ -1448,7 +1470,8 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
         .toSet();
 
-    final habitColor = _parseColor(_habit?.color);
+    final baseHabitColor = _parseColor(_habit?.color);
+    final habitColor = _enhanceColorForDarkMode(baseHabitColor, isDark);
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     // Show 2 years of history (no restriction) - allows backfilling completions
@@ -1617,16 +1640,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         ),
       );
     }
-
-    // Use a scroll controller to scroll to the end (showing today)
-    final scrollController = ScrollController();
-    
-    // Schedule scroll to end after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
-        scrollController.jumpTo(scrollController.position.maxScrollExtent);
-      }
-    });
 
     return SingleChildScrollView(
       controller: scrollController,
@@ -2018,6 +2031,18 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     } catch (e) {
       return Colors.blue;
     }
+  }
+
+  /// Enhance color for better visibility in dark mode
+  Color _enhanceColorForDarkMode(Color color, bool isDark) {
+    if (!isDark) return color;
+    
+    // Convert to HSL and increase saturation/lightness for dark mode
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withSaturation((hsl.saturation * 1.2).clamp(0.0, 1.0))
+        .withLightness((hsl.lightness * 1.15).clamp(0.3, 0.7))
+        .toColor();
   }
 
   void _showNotesPopup(DateTime date, String dateStr, Color habitColor,
@@ -2458,6 +2483,230 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                   ],
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Frequency Dot Matrix Chart - Shows completions over time in a dot matrix format
+  Widget _buildFrequencyDotMatrixSection(
+      Color habitColor, ThemeData theme, bool isDark) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Get completion dates as a set for quick lookup
+    final completionDates = _completions
+        .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
+        .toSet();
+    
+    // Count completions per date for intensity
+    final completionCounts = <String, int>{};
+    for (final c in _completions) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(c.date);
+      completionCounts[dateStr] = (completionCounts[dateStr] ?? 0) + 1;
+    }
+    
+    // Find max completions for a single day (for dot sizing)
+    final maxCompletions = completionCounts.isEmpty 
+        ? 1 
+        : completionCounts.values.reduce((a, b) => a > b ? a : b);
+    
+    // Show 5 years of data
+    final startDate = DateTime(today.year - 5, today.month, 1);
+    
+    // Calculate weeks
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    // Adjust start to beginning of week (Monday)
+    final adjustedStart = startDate.subtract(Duration(days: (startDate.weekday - 1) % 7));
+    final daysDiff = today.difference(adjustedStart).inDays;
+    final numWeeks = (daysDiff / 7).ceil() + 1;
+    
+    // Find unique months to display
+    Map<int, String> monthHeaders = {};
+    for (int week = 0; week < numWeeks; week++) {
+      final weekStart = adjustedStart.add(Duration(days: week * 7));
+      if (week == 0 ||
+          weekStart.month != adjustedStart.add(Duration(days: (week - 1) * 7)).month) {
+        String label = DateFormat('MMM').format(weekStart);
+        if (weekStart.month == 1 || week == 0) {
+          label = '${DateFormat('MMM').format(weekStart)} ${weekStart.year}';
+        }
+        monthHeaders[week] = label;
+      }
+    }
+    
+    // Build week columns
+    List<Widget> weekColumns = [];
+    for (int week = 0; week < numWeeks; week++) {
+      List<Widget> dayWidgets = [];
+      
+      // Month header
+      dayWidgets.add(
+        SizedBox(
+          height: 20,
+          child: monthHeaders.containsKey(week)
+              ? Text(
+                  monthHeaders[week]!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                  ),
+                )
+              : null,
+        ),
+      );
+      
+      // Days
+      for (int day = 0; day < 7; day++) {
+        final date = adjustedStart.add(Duration(days: week * 7 + day));
+        final dateStr = DateFormat('yyyy-MM-dd').format(date);
+        final isCompleted = completionDates.contains(dateStr);
+        final completionCount = completionCounts[dateStr] ?? 0;
+        final isFuture = date.isAfter(today);
+        final isBeforeStart = date.isBefore(startDate);
+        
+        // Calculate dot size based on completion count
+        double dotSize = 0;
+        if (isCompleted) {
+          final intensity = completionCount / maxCompletions;
+          dotSize = 6 + (intensity * 10); // Range from 6 to 16
+        }
+        
+        dayWidgets.add(
+          Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.symmetric(vertical: 1),
+            child: Center(
+              child: (isFuture || isBeforeStart)
+                  ? const SizedBox.shrink()
+                  : isCompleted
+                      ? Container(
+                          width: dotSize,
+                          height: dotSize,
+                          decoration: BoxDecoration(
+                            color: habitColor.withValues(
+                                alpha: 0.4 + (completionCount / maxCompletions) * 0.6),
+                            shape: BoxShape.circle,
+                            boxShadow: completionCount > 1
+                                ? [
+                                    BoxShadow(
+                                      color: habitColor.withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                      spreadRadius: 0,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        )
+                      : Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+            ),
+          ),
+        );
+      }
+      
+      weekColumns.add(Column(children: dayWidgets));
+    }
+    
+    // Day labels column
+    List<Widget> dayLabels = [
+      const SizedBox(height: 20),
+    ];
+    for (final dayName in dayNames) {
+      dayLabels.add(
+        Container(
+          height: 28,
+          margin: const EdgeInsets.symmetric(vertical: 1),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 8),
+          child: Text(
+            dayName,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Create scroll controller for horizontal scrolling
+    final scrollController = ScrollController();
+    
+    // Schedule scroll to end after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Frequency',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.dividerColor.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Day labels on the right side
+              Column(children: dayLabels),
+              // Scrollable chart
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: weekColumns,
+                  ),
+                ),
+              ),
+              // Day name labels on right
+              const SizedBox(width: 8),
+              Column(
+                children: [
+                  const SizedBox(height: 20),
+                  ...dayNames.map((dayName) => Container(
+                    height: 28,
+                    margin: const EdgeInsets.symmetric(vertical: 1),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      dayName,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                      ),
+                    ),
+                  )),
+                ],
+              ),
             ],
           ),
         ),
