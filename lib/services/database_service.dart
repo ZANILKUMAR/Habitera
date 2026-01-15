@@ -59,7 +59,7 @@ class DatabaseService {
     }
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -79,6 +79,16 @@ class DatabaseService {
       // Add notes column to completions table
       await db.execute('ALTER TABLE completions ADD COLUMN notes TEXT');
     }
+    if (oldVersion < 4) {
+      // Add sortOrder column to habits table
+      await db.execute('ALTER TABLE habits ADD COLUMN sortOrder INTEGER DEFAULT 0');
+      // Initialize sort order based on creation date
+      await db.execute('''
+        UPDATE habits SET sortOrder = (
+          SELECT COUNT(*) FROM habits h2 WHERE h2.createdAt <= habits.createdAt
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -94,7 +104,8 @@ class DatabaseService {
         icon TEXT,
         reminderTime TEXT,
         createdAt TEXT NOT NULL,
-        archivedAt TEXT
+        archivedAt TEXT,
+        sortOrder INTEGER DEFAULT 0
       )
     ''');
 
@@ -212,6 +223,7 @@ class DatabaseService {
     final maps = await db.query(
       'habits',
       where: 'archivedAt IS NULL',
+      orderBy: 'sortOrder ASC, createdAt ASC',
     );
     return List.generate(maps.length, (i) => _habitFromMap(maps[i]));
   }
@@ -257,6 +269,22 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  /// Updates the sort order for multiple habits in a single transaction
+  Future<void> updateHabitSortOrders(List<String> habitIds) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      for (int i = 0; i < habitIds.length; i++) {
+        await txn.update(
+          'habits',
+          {'sortOrder': i},
+          where: 'id = ?',
+          whereArgs: [habitIds[i]],
+        );
+      }
+    });
+    debugPrint('Updated sort order for ${habitIds.length} habits');
   }
 
   // Completions
@@ -645,6 +673,7 @@ class DatabaseService {
       archivedAt: map['archivedAt'] != null
           ? DateTime.parse(map['archivedAt'] as String)
           : null,
+      sortOrder: (map['sortOrder'] as int?) ?? 0,
     );
   }
 
@@ -660,6 +689,7 @@ class DatabaseService {
       'reminderTime': habit.reminderTime,
       'createdAt': habit.createdAt.toIso8601String(),
       'archivedAt': habit.archivedAt?.toIso8601String(),
+      'sortOrder': habit.sortOrder,
     };
   }
 

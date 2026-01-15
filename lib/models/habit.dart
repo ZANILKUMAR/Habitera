@@ -14,6 +14,7 @@ class Habit {
   final String? reminderTime; // HH:mm format
   final DateTime createdAt;
   final DateTime? archivedAt; // For soft delete
+  final int sortOrder; // For manual sorting
 
   Habit({
     required this.id,
@@ -26,6 +27,7 @@ class Habit {
     this.reminderTime,
     required this.createdAt,
     this.archivedAt,
+    this.sortOrder = 0,
   });
 
   bool get isArchived => archivedAt != null;
@@ -44,6 +46,7 @@ class Habit {
     String? reminderTime,
     DateTime? createdAt,
     DateTime? archivedAt,
+    int? sortOrder,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -56,6 +59,7 @@ class Habit {
       reminderTime: reminderTime ?? this.reminderTime,
       createdAt: createdAt ?? this.createdAt,
       archivedAt: archivedAt ?? this.archivedAt,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 }

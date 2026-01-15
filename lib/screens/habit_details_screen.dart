@@ -41,6 +41,123 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
   Set<String> _completionDatesWithNotes =
       {}; // Dates with notes in 'yyyy-MM-dd' format
 
+  /// Determines if a date shows a "fulfilled" state for frequency-based habits
+  /// Returns: true if the frequency goal has been met and this day is in the fulfilled window
+  /// Fulfilled = goal achieved, remaining days in period show subtle "done" indication
+  bool _isFulfilledDay(DateTime date, Set<String> completionDates) {
+    if (_habit == null) return false;
+    
+    final today = DateTime.now();
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    
+    // Don't show fulfilled state for future dates
+    if (dateOnly.isAfter(todayOnly)) return false;
+    
+    // Don't show on days that are already completed
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    if (completionDates.contains(dateStr)) return false;
+    
+    switch (_habit!.frequency) {
+      case HabitFrequency.daily:
+        // Daily habits - no fulfilled state (every day needs completion)
+        return false;
+        
+      case HabitFrequency.everyXDays:
+        // Every X days - show fulfilled for remaining days in current cycle after completion
+        final interval = _habit!.customDays ?? 2;
+        
+        // Find the most recent completion before or on this date
+        DateTime? lastCompletionBeforeOrOn;
+        for (final cDateStr in completionDates) {
+          final d = DateTime.parse(cDateStr);
+          final dOnly = DateTime(d.year, d.month, d.day);
+          if (!dOnly.isAfter(dateOnly)) {
+            if (lastCompletionBeforeOrOn == null || dOnly.isAfter(lastCompletionBeforeOrOn)) {
+              lastCompletionBeforeOrOn = dOnly;
+            }
+          }
+        }
+        
+        if (lastCompletionBeforeOrOn == null) {
+          return false; // No completion yet - not fulfilled
+        }
+        
+        // This date is fulfilled if it's after the completion but before the next due date
+        final daysSinceCompletion = dateOnly.difference(lastCompletionBeforeOrOn).inDays;
+        return daysSinceCompletion > 0 && daysSinceCompletion < interval;
+        
+      case HabitFrequency.timesPerWeek:
+        // X times per week - show fulfilled when weekly goal is met
+        final required = _habit!.customDays ?? 3;
+        
+        // Get the week containing this date
+        final weekStart = dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        
+        // Count completions in this week
+        int weekCompletions = 0;
+        for (final cDateStr in completionDates) {
+          final d = DateTime.parse(cDateStr);
+          final dOnly = DateTime(d.year, d.month, d.day);
+          if (!dOnly.isBefore(weekStart) && !dOnly.isAfter(weekEnd)) {
+            weekCompletions++;
+          }
+        }
+        
+        // Show fulfilled if weekly target is met
+        return weekCompletions >= required;
+        
+      case HabitFrequency.timesPerMonth:
+        // X times per month - show fulfilled when monthly goal is met
+        final required = _habit!.customDays ?? 10;
+        
+        // Count completions in this month
+        int monthCompletions = 0;
+        for (final cDateStr in completionDates) {
+          final d = DateTime.parse(cDateStr);
+          if (d.year == dateOnly.year && d.month == dateOnly.month) {
+            monthCompletions++;
+          }
+        }
+        
+        // Show fulfilled if monthly target is met
+        return monthCompletions >= required;
+        
+      case HabitFrequency.specificDays:
+        // Specific days - show fulfilled when all selected days in the week are completed
+        final selectedDaysMask = _habit!.customDays ?? 0;
+        
+        // Get the week containing this date
+        final weekStart = dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+        
+        // Check if this day is one of the selected days - if so, no fulfilled state
+        final dayIndex = (dateOnly.weekday - 1) % 7; // 0 = Monday
+        if ((selectedDaysMask & (1 << dayIndex)) != 0) {
+          return false; // This is a required day, not a "rest" day
+        }
+        
+        // Count how many selected days are in a week and how many are completed
+        int requiredDaysInWeek = 0;
+        int completedRequiredDays = 0;
+        
+        for (int i = 0; i < 7; i++) {
+          if ((selectedDaysMask & (1 << i)) != 0) {
+            requiredDaysInWeek++;
+            // Check if this day is completed
+            final dayDate = weekStart.add(Duration(days: i));
+            final dayDateStr = DateFormat('yyyy-MM-dd').format(dayDate);
+            if (completionDates.contains(dayDateStr)) {
+              completedRequiredDays++;
+            }
+          }
+        }
+        
+        // Show fulfilled if all required days in the week are completed
+        return requiredDaysInWeek > 0 && completedRequiredDays >= requiredDaysInWeek;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -748,6 +865,8 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
             date.day == today.day;
         final isFuture = date.isAfter(today);
         final isBeforeStart = date.isBefore(startDate);
+        final isFulfilled = !isCompleted && !isFuture && !isBeforeStart && 
+            _isFulfilledDay(date, completionDates);
 
         dayWidgets.add(
           GestureDetector(
@@ -764,16 +883,27 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? habitColor
-                          : (isFuture || isBeforeStart)
-                              ? Colors.transparent
-                              : (isDark
-                                      ? Colors.grey.shade800
-                                      : Colors.grey.shade700)
-                                  .withValues(alpha: 0.3),
+                          : isFulfilled
+                              ? (isDark 
+                                  ? Colors.green.shade900.withValues(alpha: 0.25)
+                                  : Colors.green.shade50)
+                              : (isFuture || isBeforeStart)
+                                  ? Colors.transparent
+                                  : (isDark
+                                          ? Colors.grey.shade800
+                                          : Colors.grey.shade700)
+                                      .withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(6),
                       border: isToday
                           ? Border.all(color: habitColor, width: 2)
-                          : null,
+                          : isFulfilled
+                              ? Border.all(
+                                  color: isDark 
+                                      ? Colors.green.shade700.withValues(alpha: 0.4)
+                                      : Colors.green.shade200,
+                                  width: 1,
+                                )
+                              : null,
                     ),
                     child: Center(
                       child: Text(
@@ -822,13 +952,14 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     for (final dayName in dayNames) {
       dayLabels.add(
         Container(
+          width: 28,
           height: 36,
           margin: const EdgeInsets.symmetric(vertical: 2),
-          alignment: Alignment.center,
+          alignment: Alignment.centerRight,
           child: Text(
             dayName,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               fontWeight: FontWeight.w500,
               fontSize: 10,
             ),
@@ -847,17 +978,28 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       }
     });
 
-    return SingleChildScrollView(
-      controller: scrollController,
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(children: dayLabels),
-          const SizedBox(width: 8),
-          ...weekColumns,
-        ],
-      ),
+    // Fixed day labels on left, scrollable calendar on right
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Fixed day labels
+        SizedBox(
+          width: 28,
+          child: Column(children: dayLabels),
+        ),
+        const SizedBox(width: 4),
+        // Scrollable calendar
+        Expanded(
+          child: SingleChildScrollView(
+            controller: scrollController,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: weekColumns,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1527,9 +1669,10 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
             date.month == today.month &&
             date.day == today.day;
         final isFuture = date.isAfter(today);
-        final isBeforeHabitCreation = _habit?.createdAt != null &&
-            date.isBefore(DateTime(_habit!.createdAt.year,
-                _habit!.createdAt.month, _habit!.createdAt.day));
+        // Only check creation date if we're not showing backfilled completions
+        // Allow fulfilled state for any day that has completions around it
+        final isFulfilled = !isCompleted && !isFuture && 
+            _isFulfilledDay(date, completionDates);
 
         dayWidgets.add(
           GestureDetector(
@@ -1557,16 +1700,27 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? habitColor
-                          : (isFuture || isBeforeHabitCreation)
-                              ? Colors.transparent
-                              : (isDark
-                                      ? Colors.grey.shade800
-                                      : Colors.grey.shade700)
-                                  .withValues(alpha: 0.3),
+                          : isFulfilled
+                              ? (isDark 
+                                  ? Colors.green.shade900.withValues(alpha: 0.25)
+                                  : Colors.green.shade50)
+                              : isFuture
+                                  ? Colors.transparent
+                                  : (isDark
+                                          ? Colors.grey.shade800
+                                          : Colors.grey.shade700)
+                                      .withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(6),
                       border: isToday
                           ? Border.all(color: habitColor, width: 2)
-                          : null,
+                          : isFulfilled
+                              ? Border.all(
+                                  color: isDark 
+                                      ? Colors.green.shade700.withValues(alpha: 0.4)
+                                      : Colors.green.shade200,
+                                  width: 1,
+                                )
+                              : null,
                     ),
                     child: Center(
                       child: Text(
@@ -1619,20 +1773,21 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       weekColumns.add(Column(children: dayWidgets));
     }
 
-    // Day name labels column
+    // Day name labels column (Mon, Tue, Wed, etc.)
     List<Widget> dayLabels = [
       const SizedBox(height: 20),
     ];
     for (final dayName in dayNames) {
       dayLabels.add(
         Container(
+          width: 28,
           height: 36,
           margin: const EdgeInsets.symmetric(vertical: 2),
-          alignment: Alignment.center,
+          alignment: Alignment.centerRight,
           child: Text(
             dayName,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               fontWeight: FontWeight.w500,
               fontSize: 10,
             ),
@@ -1641,17 +1796,28 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
       );
     }
 
-    return SingleChildScrollView(
-      controller: scrollController,
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(children: dayLabels),
-          const SizedBox(width: 8),
-          ...weekColumns,
-        ],
-      ),
+    // Use a Row with fixed day labels and scrollable calendar
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Fixed day labels on the left
+        SizedBox(
+          width: 28,
+          child: Column(children: dayLabels),
+        ),
+        const SizedBox(width: 4),
+        // Scrollable calendar grid
+        Expanded(
+          child: SingleChildScrollView(
+            controller: scrollController,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: weekColumns,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
