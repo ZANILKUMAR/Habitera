@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -16,10 +18,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   String _chartFilter = 'weekly'; // 'weekly', 'monthly', 'quarterly', 'yearly'
   String _habitChartFilter = 'week'; // 'week', 'month', 'quarter', 'year', 'lifetime'
   final ScrollController _historyChartScrollController = ScrollController();
+  final ScrollController _lineChartScrollController = ScrollController();
 
   @override
   void dispose() {
     _historyChartScrollController.dispose();
+    _lineChartScrollController.dispose();
     super.dispose();
   }
 
@@ -28,6 +32,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       if (_historyChartScrollController.hasClients) {
         _historyChartScrollController.jumpTo(
           _historyChartScrollController.position.maxScrollExtent,
+        );
+      }
+      if (_lineChartScrollController.hasClients) {
+        _lineChartScrollController.jumpTo(
+          _lineChartScrollController.position.maxScrollExtent,
         );
       }
     });
@@ -39,13 +48,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ? Colors.grey.shade800.withValues(alpha: 0.5)
           : Colors.grey.shade100;
     } else if (percentage < 25) {
-      return const Color(0xFFE8F5E9);
+      // Low intensity - light green, but more visible in dark mode
+      return isDark
+          ? const Color(0xFF4CAF50).withValues(alpha: 0.4)
+          : const Color(0xFFE8F5E9);
     } else if (percentage < 50) {
-      return const Color(0xFFA5D6A7);
+      return isDark
+          ? const Color(0xFF66BB6A)
+          : const Color(0xFFA5D6A7);
     } else if (percentage < 75) {
-      return const Color(0xFF66BB6A);
+      return isDark
+          ? const Color(0xFF81C784)
+          : const Color(0xFF66BB6A);
     } else {
-      return const Color(0xFF43A047);
+      return isDark
+          ? const Color(0xFF4CAF50)
+          : const Color(0xFF43A047);
     }
   }
 
@@ -110,11 +128,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         // Monthly calendar
                         _buildMonthlyCalendar(heatmap, theme, isDark),
 
+                        // Habit Comparison Chart (Habit Overview)
+                        _buildHabitComparisonChart(habits, theme, isDark),
+
                         // History Chart
                         _buildHistoryChart(heatmap, theme, isDark),
-
-                        // Habit Comparison Chart
-                        _buildHabitComparisonChart(habits, theme, isDark),
 
                         const SizedBox(height: 32),
                       ],
@@ -300,6 +318,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           const SizedBox(height: 20),
           // Bar chart
           _buildBarChart(heatmap, theme, isDark),
+          const SizedBox(height: 24),
+          // Line chart
+          _buildLineChart(heatmap, theme, isDark),
         ],
       ),
     );
@@ -563,6 +584,53 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLineChart(Map<String, int> heatmap, ThemeData theme, bool isDark) {
+    final data = _getChartData(heatmap);
+    if (data.isEmpty) return const SizedBox.shrink();
+    
+    final maxValue = data.map((d) => d.value).reduce((a, b) => a > b ? a : b);
+    final normalizedMax = maxValue == 0 ? 100.0 : maxValue.toDouble();
+    
+    // Soft, calm colors for the line
+    final lineColor = isDark
+        ? const Color(0xFF81C784) // Soft green for dark mode
+        : const Color(0xFF66BB6A); // Slightly darker for light mode
+    final currentPointColor = isDark
+        ? const Color(0xFF4FC3F7) // Soft blue accent for current period
+        : const Color(0xFF42A5F5);
+
+    return SizedBox(
+      height: 140,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Calculate total width needed
+          const double pointSpacing = 52.0;
+          final totalWidth = data.length * pointSpacing;
+          
+          return SingleChildScrollView(
+            controller: _lineChartScrollController,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: totalWidth,
+              child: CustomPaint(
+                painter: _LineChartPainter(
+                  data: data,
+                  maxValue: normalizedMax,
+                  lineColor: lineColor,
+                  currentPointColor: currentPointColor,
+                  textColor: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  primaryColor: theme.colorScheme.primary,
+                  isDark: isDark,
+                ),
+                size: Size(totalWidth, 140),
+              ),
             ),
           );
         },
@@ -1024,6 +1092,185 @@ class _HabitChartData {
     required this.emoji,
     required this.value,
   });
+}
+
+/// Custom painter for the line chart
+class _LineChartPainter extends CustomPainter {
+  final List<_ChartData> data;
+  final double maxValue;
+  final Color lineColor;
+  final Color currentPointColor;
+  final Color textColor;
+  final Color primaryColor;
+  final bool isDark;
+
+  _LineChartPainter({
+    required this.data,
+    required this.maxValue,
+    required this.lineColor,
+    required this.currentPointColor,
+    required this.textColor,
+    required this.primaryColor,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
+    const double pointSpacing = 52.0;
+    const double topPadding = 20.0;
+    const double bottomPadding = 30.0;
+    final chartHeight = size.height - topPadding - bottomPadding;
+
+    // Create points
+    final points = <Offset>[];
+    for (int i = 0; i < data.length; i++) {
+      final x = (i * pointSpacing) + (pointSpacing / 2);
+      final normalizedValue = maxValue > 0 ? data[i].value / maxValue : 0.0;
+      final y = topPadding + chartHeight * (1 - normalizedValue);
+      points.add(Offset(x, y));
+    }
+
+    // Draw subtle horizontal guide lines
+    final guideLinePaint = Paint()
+      ..color = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)
+      ..strokeWidth = 1;
+    
+    for (int i = 0; i <= 3; i++) {
+      final y = topPadding + (chartHeight / 3) * i;
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        guideLinePaint,
+      );
+    }
+
+    // Draw gradient fill under the line
+    if (points.length >= 2) {
+      final fillPath = Path();
+      fillPath.moveTo(points.first.dx, size.height - bottomPadding);
+      for (final point in points) {
+        fillPath.lineTo(point.dx, point.dy);
+      }
+      fillPath.lineTo(points.last.dx, size.height - bottomPadding);
+      fillPath.close();
+
+      final fillPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            lineColor.withValues(alpha: 0.3),
+            lineColor.withValues(alpha: 0.05),
+          ],
+        ).createShader(Rect.fromLTWH(0, topPadding, size.width, chartHeight));
+      
+      canvas.drawPath(fillPath, fillPaint);
+    }
+
+    // Draw the line with smooth curves
+    if (points.length >= 2) {
+      final linePaint = Paint()
+        ..color = lineColor
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
+      final path = Path();
+      path.moveTo(points.first.dx, points.first.dy);
+
+      // Use smooth curves between points
+      for (int i = 1; i < points.length; i++) {
+        final prev = points[i - 1];
+        final curr = points[i];
+        final controlX = (prev.dx + curr.dx) / 2;
+        path.cubicTo(controlX, prev.dy, controlX, curr.dy, curr.dx, curr.dy);
+      }
+
+      canvas.drawPath(path, linePaint);
+    }
+
+    // Draw data points
+    for (int i = 0; i < points.length; i++) {
+      final point = points[i];
+      final isCurrentPeriod = data[i].isCurrentPeriod;
+      final pointColor = isCurrentPeriod ? currentPointColor : lineColor;
+      
+      // Outer circle (subtle glow)
+      if (data[i].value > 0) {
+        final glowPaint = Paint()
+          ..color = pointColor.withValues(alpha: 0.2)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(point, 6, glowPaint);
+      }
+      
+      // Main point
+      final pointPaint = Paint()
+        ..color = data[i].value > 0 ? pointColor : pointColor.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(point, 4, pointPaint);
+      
+      // White inner for current period
+      if (isCurrentPeriod && data[i].value > 0) {
+        final innerPaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(point, 2, innerPaint);
+      }
+
+      // Draw labels
+      final textSpan = TextSpan(
+        text: data[i].label,
+        style: TextStyle(
+          color: isCurrentPeriod ? primaryColor : textColor,
+          fontSize: 10,
+          fontWeight: isCurrentPeriod ? FontWeight.w600 : FontWeight.w500,
+        ),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: ui.TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+      textPainter.layout(maxWidth: pointSpacing - 4);
+      textPainter.paint(
+        canvas,
+        Offset(point.dx - textPainter.width / 2, size.height - bottomPadding + 8),
+      );
+
+      // Draw value above point if > 0
+      if (data[i].value > 0) {
+        final valueSpan = TextSpan(
+          text: '${data[i].value}',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        );
+        final valuePainter = TextPainter(
+          text: valueSpan,
+          textDirection: ui.TextDirection.ltr,
+          textAlign: TextAlign.center,
+        );
+        valuePainter.layout();
+        valuePainter.paint(
+          canvas,
+          Offset(point.dx - valuePainter.width / 2, point.dy - 16),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LineChartPainter oldDelegate) {
+    return data != oldDelegate.data ||
+        maxValue != oldDelegate.maxValue ||
+        lineColor != oldDelegate.lineColor ||
+        isDark != oldDelegate.isDark;
+  }
 }
 
 /// Helper class for chart data
