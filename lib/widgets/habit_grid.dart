@@ -28,12 +28,138 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   Map<String, Set<String>> _completions = {}; // habitId -> set of date strings
   Map<String, Set<String>> _completionsWithNotes = {}; // habitId -> set of date strings that have notes
   bool _notePromptOnTap = false; // Cached setting value
+  
+  // Local habits list for optimistic reordering (prevents flicker)
+  List<Habit>? _localHabits;
+  
+  /// Get the current habits list (local if reordering, otherwise from widget)
+  List<Habit> get _habits => _localHabits ?? widget.habits;
 
   // Fixed dimensions - prioritize habit name visibility
   static const double _habitColumnWidth = 160.0;
   static const double _dateCellWidth = 44.0;
   static const double _headerHeight = 44.0;
   static const double _rowHeight = 52.0;
+
+  /// Determines if a date shows a "fulfilled" state for frequency-based habits
+  /// Returns: true if the frequency goal has been met and this day is in the fulfilled window
+  /// Fulfilled = goal achieved, remaining days in period show subtle "done" indication
+  bool _isFulfilledDay(Habit habit, DateTime date) {
+    final today = DateTime.now();
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    
+    // Don't show fulfilled state for future dates
+    if (dateOnly.isAfter(todayOnly)) return false;
+    
+    // Don't show on days that are already completed
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final isCompleted = _completions[habit.id]?.contains(dateStr) ?? false;
+    if (isCompleted) return false;
+    
+    final completions = _completions[habit.id] ?? {};
+    
+    switch (habit.frequency) {
+      case HabitFrequency.daily:
+        // Daily habits - no fulfilled state (every day needs completion)
+        return false;
+        
+      case HabitFrequency.everyXDays:
+        // Every X days - show fulfilled for remaining days in current cycle after completion
+        final interval = habit.customDays ?? 2;
+        
+        // Find the start of the current cycle containing this date
+        // Cycles are based on the most recent completion before or on this date
+        DateTime? lastCompletionBeforeOrOn;
+        for (final cDateStr in completions) {
+          final d = DateTime.parse(cDateStr);
+          final dOnly = DateTime(d.year, d.month, d.day);
+          if (!dOnly.isAfter(dateOnly)) {
+            if (lastCompletionBeforeOrOn == null || dOnly.isAfter(lastCompletionBeforeOrOn)) {
+              lastCompletionBeforeOrOn = dOnly;
+            }
+          }
+        }
+        
+        if (lastCompletionBeforeOrOn == null) {
+          return false; // No completion yet - not fulfilled
+        }
+        
+        // This date is within the fulfilled window if it's after the completion
+        // but before the next due date (within the X-day cycle)
+        final daysSinceCompletion = dateOnly.difference(lastCompletionBeforeOrOn).inDays;
+        return daysSinceCompletion > 0 && daysSinceCompletion < interval;
+        
+      case HabitFrequency.timesPerWeek:
+        // X times per week - show fulfilled when weekly goal is met
+        final required = habit.customDays ?? 3;
+        
+        // Get the week containing this date
+        final weekStart = dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        
+        // Count completions in this week
+        int weekCompletions = 0;
+        for (final cDateStr in completions) {
+          final d = DateTime.parse(cDateStr);
+          final dOnly = DateTime(d.year, d.month, d.day);
+          if (!dOnly.isBefore(weekStart) && !dOnly.isAfter(weekEnd)) {
+            weekCompletions++;
+          }
+        }
+        
+        // Show fulfilled if weekly target is met
+        return weekCompletions >= required;
+        
+      case HabitFrequency.timesPerMonth:
+        // X times per month - show fulfilled when monthly goal is met
+        final required = habit.customDays ?? 10;
+        
+        // Count completions in this month
+        int monthCompletions = 0;
+        for (final cDateStr in completions) {
+          final d = DateTime.parse(cDateStr);
+          if (d.year == dateOnly.year && d.month == dateOnly.month) {
+            monthCompletions++;
+          }
+        }
+        
+        // Show fulfilled if monthly target is met
+        return monthCompletions >= required;
+        
+      case HabitFrequency.specificDays:
+        // Specific days - show fulfilled when all selected days in the week are completed
+        final selectedDaysMask = habit.customDays ?? 0;
+        
+        // Get the week containing this date
+        final weekStart = dateOnly.subtract(Duration(days: dateOnly.weekday - 1));
+        
+        // Check if this day is one of the selected days - if so, no fulfilled state
+        final dayIndex = (dateOnly.weekday - 1) % 7; // 0 = Monday
+        if ((selectedDaysMask & (1 << dayIndex)) != 0) {
+          return false; // This is a required day, not a "rest" day
+        }
+        
+        // Count how many selected days are in a week and how many are completed
+        int requiredDaysInWeek = 0;
+        int completedRequiredDays = 0;
+        
+        for (int i = 0; i < 7; i++) {
+          if ((selectedDaysMask & (1 << i)) != 0) {
+            requiredDaysInWeek++;
+            // Check if this day is completed
+            final dayDate = weekStart.add(Duration(days: i));
+            final dayDateStr = DateFormat('yyyy-MM-dd').format(dayDate);
+            if (completions.contains(dayDateStr)) {
+              completedRequiredDays++;
+            }
+          }
+        }
+        
+        // Show fulfilled if all required days in the week are completed
+        return requiredDaysInWeek > 0 && completedRequiredDays >= requiredDaysInWeek;
+    }
+  }
 
   @override
   void initState() {
@@ -59,6 +185,17 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   @override
   void didUpdateWidget(covariant HabitGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
+    
+    // Clear local reorder state when provider updates match our order
+    if (_localHabits != null) {
+      final localIds = _localHabits!.map((h) => h.id).join(',');
+      final widgetIds = widget.habits.map((h) => h.id).join(',');
+      if (localIds == widgetIds) {
+        // Provider caught up - clear local state
+        _localHabits = null;
+      }
+    }
+    
     // Reload completions if habits list changed
     if (widget.habits.length != oldWidget.habits.length ||
         widget.habits.map((h) => h.id).join(',') != 
@@ -81,7 +218,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
     final completions = <String, Set<String>>{};
     final completionsWithNotes = <String, Set<String>>{};
 
-    for (final habit in widget.habits) {
+    for (final habit in _habits) {
       final habitCompletions = await _db.getCompletionsForHabit(habit.id);
       completions[habit.id] = habitCompletions
           .map((c) => DateFormat('yyyy-MM-dd').format(c.date))
@@ -98,6 +235,35 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
         _completionsWithNotes = completionsWithNotes;
       });
     }
+  }
+
+  /// Handles reordering of habits via drag-and-drop
+  Future<void> _onReorderHabits(int oldIndex, int newIndex) async {
+    // Adjust index if moving down (ReorderableListView behavior)
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+    
+    // Skip if no actual change
+    if (oldIndex == newIndex) return;
+    
+    // Optimistic update: update local state immediately (no flicker)
+    final reorderedHabits = List<Habit>.from(_habits);
+    final habit = reorderedHabits.removeAt(oldIndex);
+    reorderedHabits.insert(newIndex, habit);
+    
+    setState(() {
+      _localHabits = reorderedHabits;
+    });
+    
+    // Get the new order of habit IDs
+    final habitIds = reorderedHabits.map((h) => h.id).toList();
+    
+    // Save to database in background
+    await _db.updateHabitSortOrders(habitIds);
+    
+    // Silently refresh provider - our local state prevents flicker
+    ref.invalidate(habitsProvider);
   }
 
   /// Handles tap on a completion cell based on notePromptOnTap setting
@@ -615,7 +781,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
       }
     });
 
-    if (widget.habits.isEmpty) {
+    if (_habits.isEmpty) {
       return _buildEmptyState(theme);
     }
 
@@ -696,10 +862,11 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
             verticalController: _verticalScrollController,
             habitColumnWidth: _habitColumnWidth,
             scrollableWidth: scrollableWidth,
-            habits: widget.habits,
+            habits: _habits,
             rowHeight: _rowHeight,
             buildHabitNameCell: (habit) => _buildHabitNameCell(habit, theme, isDark),
             buildHabitRow: (habit) => _buildHabitCompletionRow(habit, theme, isDark),
+            onReorder: _onReorderHabits,
           ),
         ),
       ],
@@ -828,6 +995,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
     final isCompleted = _completions[habit.id]?.contains(dateStr) ?? false;
     final hasNotes = _completionsWithNotes[habit.id]?.contains(dateStr) ?? false;
     final isToday = _isToday(date);
+    final isFulfilled = _isFulfilledDay(habit, date);
 
     return GestureDetector(
       onTap: () => _onCompletionTap(habit, date),
@@ -842,23 +1010,33 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
           children: [
             Container(
               decoration: BoxDecoration(
+                // Fulfilled state: very subtle tint to show "goal met"
                 color: isCompleted
                     ? habitColor.withValues(alpha: 0.25)
-                    : isDark
-                        ? Colors.grey.shade800.withValues(alpha: 0.25)
-                        : Colors.grey.shade50,
+                    : isFulfilled
+                        ? (isDark 
+                            ? Colors.green.shade900.withValues(alpha: 0.15)
+                            : Colors.green.shade50.withValues(alpha: 0.8))
+                        : isDark
+                            ? Colors.grey.shade800.withValues(alpha: 0.25)
+                            : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isCompleted
                       ? habitColor.withValues(alpha: 0.4)
                       : isToday
                           ? theme.colorScheme.primary.withValues(alpha: 0.25)
-                          : isDark
-                              ? Colors.grey.shade700.withValues(alpha: 0.3)
-                              : Colors.grey.shade200,
+                          : isFulfilled
+                              ? (isDark 
+                                  ? Colors.green.shade700.withValues(alpha: 0.3)
+                                  : Colors.green.shade200.withValues(alpha: 0.6))
+                              : isDark
+                                  ? Colors.grey.shade700.withValues(alpha: 0.3)
+                                  : Colors.grey.shade200,
                   width: isToday ? 1.5 : 0.5,
                 ),
               ),
+              // No icon or symbol for fulfilled - just the subtle background
               child: Center(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 150),
@@ -951,7 +1129,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
 }
 
 /// A synchronized scroll grid widget that keeps habit names and completion cells
-/// perfectly aligned during horizontal scrolling
+/// perfectly aligned during horizontal scrolling and reordering
 class _SyncedScrollGrid extends StatefulWidget {
   final ScrollController horizontalController;
   final ScrollController verticalController;
@@ -961,6 +1139,7 @@ class _SyncedScrollGrid extends StatefulWidget {
   final double rowHeight;
   final Widget Function(Habit habit) buildHabitNameCell;
   final Widget Function(Habit habit) buildHabitRow;
+  final void Function(int oldIndex, int newIndex)? onReorder;
 
   const _SyncedScrollGrid({
     required this.horizontalController,
@@ -971,6 +1150,7 @@ class _SyncedScrollGrid extends StatefulWidget {
     required this.rowHeight,
     required this.buildHabitNameCell,
     required this.buildHabitRow,
+    this.onReorder,
   });
 
   @override
@@ -979,10 +1159,7 @@ class _SyncedScrollGrid extends StatefulWidget {
 
 class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   late ScrollController _gridHorizontalController;
-  late ScrollController _namesVerticalController;
-  late ScrollController _gridVerticalController;
-  bool _isSyncingNames = false;
-  bool _isSyncingGrid = false;
+  late ScrollController _verticalController;
   bool _isSyncingHorizontal = false;
   bool _isSyncingFromHeader = false;
 
@@ -990,16 +1167,11 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   void initState() {
     super.initState();
     _gridHorizontalController = ScrollController();
-    _namesVerticalController = ScrollController();
-    _gridVerticalController = ScrollController();
+    _verticalController = ScrollController();
 
     // Sync horizontal scroll bidirectionally between header and body
     _gridHorizontalController.addListener(_onGridHorizontalScroll);
     widget.horizontalController.addListener(_onHeaderHorizontalScroll);
-    
-    // Sync vertical scroll between names and grid
-    _namesVerticalController.addListener(_onNamesVerticalScroll);
-    _gridVerticalController.addListener(_onGridVerticalScroll);
   }
 
   void _onGridHorizontalScroll() {
@@ -1024,81 +1196,98 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     _isSyncingFromHeader = false;
   }
 
-  void _onNamesVerticalScroll() {
-    if (_isSyncingNames) return;
-    _isSyncingGrid = true;
-    
-    if (_gridVerticalController.hasClients) {
-      _gridVerticalController.jumpTo(_namesVerticalController.offset);
-    }
-    
-    _isSyncingGrid = false;
-  }
-
-  void _onGridVerticalScroll() {
-    if (_isSyncingGrid) return;
-    _isSyncingNames = true;
-    
-    if (_namesVerticalController.hasClients) {
-      _namesVerticalController.jumpTo(_gridVerticalController.offset);
-    }
-    
-    _isSyncingNames = false;
-  }
-
   @override
   void dispose() {
     _gridHorizontalController.removeListener(_onGridHorizontalScroll);
     widget.horizontalController.removeListener(_onHeaderHorizontalScroll);
-    _namesVerticalController.removeListener(_onNamesVerticalScroll);
-    _gridVerticalController.removeListener(_onGridVerticalScroll);
     _gridHorizontalController.dispose();
-    _namesVerticalController.dispose();
-    _gridVerticalController.dispose();
+    _verticalController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Add bottom padding to ensure content can scroll above the FAB
     const bottomPadding = 80.0;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
-    return Row(
-      children: [
-        // Fixed habit names column (vertical scroll synced with grid)
-        SizedBox(
-          width: widget.habitColumnWidth,
+    // Build a single unified list where each row contains habit name + scrollable completions
+    // This ensures drag-and-drop moves the entire row together without flickering
+    
+    Widget buildFullRow(Habit habit) {
+      return Row(
+        children: [
+          // Fixed habit name cell
+          SizedBox(
+            width: widget.habitColumnWidth,
+            child: widget.buildHabitNameCell(habit),
+          ),
+          // Completion cells (will be clipped by parent's horizontal scroll)
+          widget.buildHabitRow(habit),
+        ],
+      );
+    }
+    
+    if (widget.onReorder != null) {
+      // Use ReorderableListView with full rows to prevent flickering
+      return SingleChildScrollView(
+        controller: _gridHorizontalController,
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        child: SizedBox(
+          width: widget.habitColumnWidth + widget.scrollableWidth,
+          child: ReorderableListView.builder(
+            scrollController: _verticalController,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: bottomPadding),
+            itemCount: widget.habits.length,
+            buildDefaultDragHandles: false,
+            onReorder: widget.onReorder!,
+            proxyDecorator: (child, index, animation) {
+              return Material(
+                elevation: 4,
+                color: isDark 
+                    ? theme.colorScheme.surfaceContainerHighest
+                    : theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.3),
+                child: child,
+              );
+            },
+            itemBuilder: (context, index) {
+              final habit = widget.habits[index];
+              return ReorderableDelayedDragStartListener(
+                key: ValueKey(habit.id),
+                index: index,
+                child: buildFullRow(habit),
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      // Non-reorderable version
+      return SingleChildScrollView(
+        controller: _gridHorizontalController,
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        child: SizedBox(
+          width: widget.habitColumnWidth + widget.scrollableWidth,
           child: ListView.builder(
-            controller: _namesVerticalController,
+            controller: _verticalController,
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.only(bottom: bottomPadding),
             itemCount: widget.habits.length,
             itemBuilder: (context, index) {
-              return widget.buildHabitNameCell(widget.habits[index]);
+              final habit = widget.habits[index];
+              return KeyedSubtree(
+                key: ValueKey(habit.id),
+                child: buildFullRow(habit),
+              );
             },
           ),
         ),
-        // Scrollable completion grid (horizontal + vertical)
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _gridHorizontalController,
-            scrollDirection: Axis.horizontal,
-            physics: const ClampingScrollPhysics(),
-            child: SizedBox(
-              width: widget.scrollableWidth,
-              child: ListView.builder(
-                controller: _gridVerticalController,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: bottomPadding),
-                itemCount: widget.habits.length,
-                itemBuilder: (context, index) {
-                  return widget.buildHabitRow(widget.habits[index]);
-                },
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+      );
+    }
   }
 }

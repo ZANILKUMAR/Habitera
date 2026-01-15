@@ -19,6 +19,7 @@ Habit _$HabitFromJson(Map<String, dynamic> json) => Habit(
       archivedAt: json['archivedAt'] == null
           ? null
           : DateTime.parse(json['archivedAt'] as String),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$HabitToJson(Habit instance) => <String, dynamic>{
@@ -32,6 +33,7 @@ Map<String, dynamic> _$HabitToJson(Habit instance) => <String, dynamic>{
       'reminderTime': instance.reminderTime,
       'createdAt': instance.createdAt.toIso8601String(),
       'archivedAt': instance.archivedAt?.toIso8601String(),
+      'sortOrder': instance.sortOrder,
     };
 
 const _$HabitFrequencyEnumMap = {
@@ -47,6 +49,7 @@ Completion _$CompletionFromJson(Map<String, dynamic> json) => Completion(
       habitId: json['habitId'] as String,
       date: DateTime.parse(json['date'] as String),
       completedAt: DateTime.parse(json['completedAt'] as String),
+      notes: json['notes'] as String?,
     );
 
 Map<String, dynamic> _$CompletionToJson(Completion instance) =>
@@ -55,6 +58,7 @@ Map<String, dynamic> _$CompletionToJson(Completion instance) =>
       'habitId': instance.habitId,
       'date': instance.date.toIso8601String(),
       'completedAt': instance.completedAt.toIso8601String(),
+      'notes': instance.notes,
     };
 
 HabitStreak _$HabitStreakFromJson(Map<String, dynamic> json) => HabitStreak(
