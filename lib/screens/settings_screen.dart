@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import '../providers/theme_provider.dart';
 import '../providers/habit_provider.dart';
 import '../services/database_service.dart';
-import '../services/notification_service.dart';
 import '../utils/file_saver.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -17,29 +16,22 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  int _devTapCount = 0;
-  bool _developerModeEnabled = false;
+  bool _notePromptOnTap = false;
 
-  void _onVersionTap() {
-    setState(() {
-      _devTapCount++;
-      if (_devTapCount >= 7 && !_developerModeEnabled) {
-        _developerModeEnabled = true;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔧 Developer options enabled!'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else if (_devTapCount < 7 && _devTapCount >= 4) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${7 - _devTapCount} taps to enable developer options'),
-            duration: const Duration(milliseconds: 500),
-          ),
-        );
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final db = DatabaseService();
+    final settings = await db.getSettings();
+    if (mounted) {
+      setState(() {
+        _notePromptOnTap = settings.notePromptOnTap;
+      });
+    }
   }
 
   @override
@@ -77,6 +69,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     themeMode == ThemeMode.dark
                         ? Icons.dark_mode_rounded
                         : Icons.light_mode_rounded,
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Check-in Behavior Section
+                Text(
+                  'Check-in Behavior',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Tap for Notes'),
+                  subtitle: Text(
+                    _notePromptOnTap
+                        ? 'Tap opens notes • Hold to quick check-in'
+                        : 'Tap for quick check-in • Hold to add notes',
+                  ),
+                  value: _notePromptOnTap,
+                  onChanged: (value) async {
+                    setState(() {
+                      _notePromptOnTap = value;
+                    });
+                    final settings = await db.getSettings();
+                    await db.updateSettings(
+                      settings.copyWith(notePromptOnTap: value),
+                    );
+                    ref.invalidate(settingsProvider);
+                  },
+                  secondary: Icon(
+                    _notePromptOnTap
+                        ? Icons.edit_note_rounded
+                        : Icons.check_circle_rounded,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -151,19 +175,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         // Use utf8.decode for proper encoding on all platforms
                         final csvContent = utf8.decode(file.bytes!);
                         
-                        final imported = await db.importFromCSV(csvContent);
-                        ref.invalidate(habitsProvider);
-                        ref.invalidate(dailyStatsProvider);
-                        ref.invalidate(heatmapProvider);
+                        // Parse CSV to count habits and completions
+                        final counts = _parseCSVCounts(csvContent);
                         
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Imported ${imported['habits']} habits and ${imported['completions']} completions',
+                          // Show confirmation dialog
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Confirm Import'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('File: ${file.name}'),
+                                  const SizedBox(height: 16),
+                                  const Text('This file contains:'),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.checklist_rounded, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text('${counts['habits']} habits'),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.done_all_rounded, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text('${counts['completions']} completion records'),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Existing habits will be updated. New habits and completions will be added.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
                               ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Import'),
+                                ),
+                              ],
                             ),
                           );
+                          
+                          if (confirmed == true && context.mounted) {
+                            final imported = await db.importFromCSV(csvContent);
+                            ref.invalidate(habitsProvider);
+                            ref.invalidate(dailyStatsProvider);
+                            ref.invalidate(heatmapProvider);
+                            
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Imported ${imported['habits']} habits and ${imported['completions']} completions',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
                         }
                       }
                     } catch (e) {
@@ -177,10 +259,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 32),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text('Clear All Data',
+                  leading: const Icon(Icons.restart_alt, color: Colors.red),
+                  title: const Text('Reset App',
                       style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Delete all habits and progress'),
+                  subtitle: const Text('Clear data and restore default habits'),
                   onTap: () async {
                     _showClearDataDialog(context, db, ref);
                   },
@@ -193,253 +275,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Version'),
-                  subtitle: const Text('1.0.0'),
-                  onTap: _onVersionTap,
+                const ListTile(
+                  title: Text('Version'),
+                  subtitle: Text('1.0.0'),
                 ),
                 const ListTile(
                   title: Text('Build habits. Shape your life.'),
                   subtitle: Text('Habitera'),
                 ),
                 const SizedBox(height: 16),
-                
-                // Developer Options Section (hidden until 7 taps on version)
-                if (_developerModeEnabled) ...[
-                  Text(
-                    '🔧 Developer Options',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Permission Status Tile
-                  FutureBuilder<bool>(
-                    future: NotificationService().areNotificationsEnabled(),
-                    builder: (context, snapshot) {
-                      final enabled = snapshot.data ?? false;
-                      return ListTile(
-                        leading: Icon(
-                          enabled ? Icons.check_circle : Icons.warning,
-                          color: enabled ? Colors.green : Colors.orange,
-                        ),
-                        title: const Text('Notification Permission'),
-                        subtitle: Text(enabled 
-                          ? 'Notifications are enabled' 
-                          : 'Notifications are disabled - tap to enable'),
-                        onTap: enabled ? null : () async {
-                          final result = await NotificationService().requestPermissions();
-                          if (context.mounted) {
-                            if (result['notifications'] == true) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Notifications enabled!')),
-                              );
-                              setState(() {});
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please enable notifications in Settings → Apps → Habitera → Notifications'),
-                                  duration: Duration(seconds: 4),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      );
-                    },
-                  ),
-                  
-                  // Exact Alarm Permission (Android 12+)
-                  FutureBuilder<bool>(
-                    future: NotificationService().canScheduleExactAlarms(),
-                    builder: (context, snapshot) {
-                      final enabled = snapshot.data ?? false;
-                      return ListTile(
-                        leading: Icon(
-                          enabled ? Icons.check_circle : Icons.warning,
-                          color: enabled ? Colors.green : Colors.orange,
-                        ),
-                        title: const Text('Exact Alarm Permission'),
-                        subtitle: Text(enabled 
-                          ? 'Exact alarms are allowed' 
-                          : 'Required for precise reminders - tap to enable'),
-                        onTap: enabled ? null : () async {
-                          await NotificationService().requestPermissions();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please allow exact alarms in the settings that opens'),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                            setState(() {});
-                          }
-                        },
-                      );
-                    },
-                  ),
-                  
-                  const Divider(),
-                  
-                  ListTile(
-                    leading: const Icon(Icons.notifications_active),
-                    title: const Text('Test Instant Notification'),
-                    subtitle: const Text('Send a notification immediately'),
-                    onTap: () async {
-                      try {
-                        final enabled = await NotificationService().areNotificationsEnabled();
-                        if (!enabled) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enable notifications first'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                        
-                        await NotificationService().sendTestNotification();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Test notification sent! Check your notification tray.'),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.timer),
-                    title: const Text('Test Scheduled Notification'),
-                    subtitle: const Text('Schedule notification for 1 minute from now'),
-                    onTap: () async {
-                      try {
-                        final enabled = await NotificationService().areNotificationsEnabled();
-                        if (!enabled) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enable notifications first'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                        
-                        final canSchedule = await NotificationService().canScheduleExactAlarms();
-                        
-                        final result = await NotificationService().sendTestScheduledNotification();
-                        if (context.mounted) {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: Text(result['scheduled'] == true 
-                                ? '✅ Notification Scheduled' 
-                                : '❌ Scheduling Failed'),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Exact Alarms Permission: ${canSchedule ? "✅ Yes" : "❌ No"}'),
-                                  const SizedBox(height: 8),
-                                  Text('Current Time: ${result['currentTime']}'),
-                                  Text('Scheduled For: ${result['scheduledFor']}'),
-                                  Text('Timezone: ${result['timezone']}'),
-                                  const SizedBox(height: 8),
-                                  Text('Scheduled: ${result['scheduled']}'),
-                                  Text('Pending Count: ${result['totalPending']}'),
-                                  if (result['error'] != null)
-                                    Text('Error: ${result['error']}', 
-                                      style: const TextStyle(color: Colors.red)),
-                                  const SizedBox(height: 12),
-                                  if (result['scheduled'] == true)
-                                    const Text('Wait 1 minute for notification...', 
-                                      style: TextStyle(fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.schedule),
-                    title: const Text('Pending Reminders'),
-                    subtitle: const Text('View scheduled notifications'),
-                    onTap: () async {
-                      final pending = await NotificationService().getPendingNotifications();
-                      if (context.mounted) {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Pending Reminders'),
-                            content: SizedBox(
-                              width: double.maxFinite,
-                              child: pending.isEmpty
-                                  ? const Text('No pending reminders scheduled.')
-                                  : ListView.builder(
-                                      shrinkWrap: true,
-                                      itemCount: pending.length,
-                                      itemBuilder: (context, index) {
-                                        final n = pending[index];
-                                        return ListTile(
-                                          title: Text(n.title ?? 'No title'),
-                                          subtitle: Text(n.body ?? 'No body'),
-                                        );
-                                      },
-                                    ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  
-                  ListTile(
-                    leading: const Icon(Icons.developer_mode, color: Colors.orange),
-                    title: const Text('Hide Developer Options'),
-                    onTap: () {
-                      setState(() {
-                        _developerModeEnabled = false;
-                        _devTapCount = 0;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Developer options hidden')),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                ],
                 
                 // Contact Section
                 Text(
@@ -484,10 +328,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear All Data?'),
+        title: const Text('Reset App?'),
         content: const Text(
-          'This will permanently delete all your habits and completion history. '
-          'Your settings will be preserved.\n\n'
+          'This will reset the app to its initial state:\n\n'
+          '• All habits and history will be deleted\n'
+          '• Default habits will be restored\n'
+          '• Your settings will be preserved\n\n'
           'This action cannot be undone.',
         ),
         actions: [
@@ -500,25 +346,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               try {
                 await db.clearAllData();
                 
-                // Force refresh all providers
+                // Wait for database to be ready again (it closes on mobile)
+                await Future.delayed(const Duration(milliseconds: 200));
+                
+                // Re-initialize database connection by accessing it
+                await db.database;
+                
+                // Increment the refresh provider to trigger all dependent providers to reload
+                ref.read(dataRefreshProvider.notifier).state++;
+                
+                // Also invalidate providers explicitly
                 ref.invalidate(habitsProvider);
                 ref.invalidate(dailyStatsProvider);
                 ref.invalidate(heatmapProvider);
+                ref.invalidate(habitCompletionCountsProvider);
+                ref.invalidate(streaksProvider);
+                ref.invalidate(completionStateProvider);
+                ref.invalidate(settingsProvider);
                 
-                // Small delay to ensure database operations complete
+                // Additional delay to ensure all updates propagate
                 await Future.delayed(const Duration(milliseconds: 100));
 
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('All data cleared')),
+                    const SnackBar(content: Text('App reset to initial state')),
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error clearing data: $e')),
+                    SnackBar(content: Text('Error resetting app: $e')),
                   );
                 }
               }
@@ -529,5 +388,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// Parses a CSV file and returns the count of habits and completions
+  Map<String, int> _parseCSVCounts(String csvContent) {
+    final lines = csvContent.split('\n');
+    int habitsCount = 0;
+    int completionsCount = 0;
+    String currentSection = '';
+
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+
+      if (line.startsWith('# HABITS')) {
+        currentSection = 'habits';
+        continue;
+      } else if (line.startsWith('# COMPLETIONS')) {
+        currentSection = 'completions';
+        continue;
+      }
+
+      // Skip header lines
+      if (line.startsWith('id,') || line.startsWith('habitId,')) continue;
+
+      if (currentSection == 'habits') {
+        habitsCount++;
+      } else if (currentSection == 'completions') {
+        completionsCount++;
+      }
+    }
+
+    return {
+      'habits': habitsCount,
+      'completions': completionsCount,
+    };
   }
 }

@@ -72,7 +72,6 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
   TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
   Habit? existingHabit;
   bool isLoading = true;
-  bool _showMoreOptions = true;
 
   final List<String> weekDayNames = [
     'Mon',
@@ -635,140 +634,95 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Expandable header
-        InkWell(
-          onTap: () => setState(() => _showMoreOptions = !_showMoreOptions),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  _showMoreOptions
-                      ? Icons.keyboard_arrow_down_rounded
-                      : Icons.keyboard_arrow_right_rounded,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'More options',
+        // Reminder toggle
+        Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_outlined,
+                size: 20,
+                color: hasReminder
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  hasReminder
+                      ? 'Reminder at ${_formatTimeOfDay(selectedTime)}'
+                      : 'Set a reminder',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
-            ),
+              ),
+              if (hasReminder)
+                GestureDetector(
+                  onTap: _pickTime,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      'Change',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              Switch(
+                value: hasReminder,
+                onChanged: (value) async {
+                  setState(() => hasReminder = value);
+                  if (value) {
+                    await _pickTime();
+                  }
+                },
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
           ),
         ),
 
-        // Expandable content
-        AnimatedCrossFade(
-          duration: const Duration(milliseconds: 200),
-          crossFadeState: _showMoreOptions
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          firstChild: const SizedBox.shrink(),
-          secondChild: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Description - Matching style with other controls
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: TextField(
-                    controller: descriptionController,
-                    decoration: InputDecoration(
-                      hintText: 'Add a note (optional)',
-                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    maxLines: 2,
-                    minLines: 1,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
+        const SizedBox(height: 12),
 
-                const SizedBox(height: 12),
-
-                // Reminder toggle
-                Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        size: 20,
-                        color: hasReminder
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          hasReminder
-                              ? 'Reminder at ${_formatTimeOfDay(selectedTime)}'
-                              : 'Set a reminder',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (hasReminder)
-                        GestureDetector(
-                          onTap: _pickTime,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              'Change',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      Switch(
-                        value: hasReminder,
-                        onChanged: (value) async {
-                          setState(() => hasReminder = value);
-                          if (value) {
-                            await _pickTime();
-                          }
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        // Description/Note - Matching style with other controls
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.3),
             ),
+          ),
+          child: TextField(
+            controller: descriptionController,
+            decoration: InputDecoration(
+              hintText: 'Add a note (optional)',
+              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            maxLines: 2,
+            minLines: 1,
+            style: theme.textTheme.bodyMedium,
           ),
         ),
       ],

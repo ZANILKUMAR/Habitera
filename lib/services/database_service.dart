@@ -404,11 +404,10 @@ class DatabaseService {
     final db = await database;
     final map = settings.toMap();
     for (var entry in map.entries) {
-      await db.update(
-        'settings',
-        {'value': entry.value.toString()},
-        where: 'key = ?',
-        whereArgs: [entry.key],
+      // Use INSERT OR REPLACE to handle both new and existing keys
+      await db.rawInsert(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        [entry.key, entry.value.toString()],
       );
     }
   }
@@ -609,8 +608,15 @@ class DatabaseService {
     await db.delete('habits');
     // Don't delete settings - keep user preferences
     
-    // Force a fresh query on next access
-    debugPrint('All data cleared from database');
+    // Restore default habits (reset to first-time install state)
+    await _seedDefaultHabits(db);
+    
+    // On mobile, close and reopen database to clear any cached data
+    if (!kIsWeb) {
+      await closeDatabase();
+    }
+    
+    debugPrint('All data cleared and default habits restored');
   }
 
   /// Close the database connection (useful for testing or forcing refresh)

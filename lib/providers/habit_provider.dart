@@ -1,23 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/habit.dart';
+import '../models/settings.dart';
 import '../services/database_service.dart';
 
 final databaseProvider = Provider<DatabaseService>((ref) {
   return DatabaseService();
 });
 
+/// Provider to track data refresh - increment to force UI rebuild
+final dataRefreshProvider = StateProvider<int>((ref) => 0);
+
+/// Provider for app settings, automatically refreshes when settings change
+final settingsProvider = FutureProvider<AppSettings>((ref) async {
+  // Watch refresh provider to trigger reload when data is cleared
+  ref.watch(dataRefreshProvider);
+  final db = ref.watch(databaseProvider);
+  return db.getSettings();
+});
+
+/// Provider specifically for notePromptOnTap setting for quick access
+final notePromptOnTapProvider = FutureProvider<bool>((ref) async {
+  final settings = await ref.watch(settingsProvider.future);
+  return settings.notePromptOnTap;
+});
+
 final habitsProvider = FutureProvider<List<Habit>>((ref) async {
+  // Watch refresh provider to trigger reload when data is cleared
+  ref.watch(dataRefreshProvider);
   final db = ref.watch(databaseProvider);
   return db.getAllHabits();
 });
 
 final completionStateProvider =
     FutureProvider.family<bool, String>((ref, habitId) async {
+  ref.watch(dataRefreshProvider);
   final db = ref.watch(databaseProvider);
   return db.isCompletedToday(habitId);
 });
 
 final dailyStatsProvider = FutureProvider((ref) async {
+  ref.watch(dataRefreshProvider);
   final db = ref.watch(databaseProvider);
   final habits = await db.getAllHabits();
   final completions = await db.getCompletionsForDate(DateTime.now());
@@ -34,11 +56,13 @@ final dailyStatsProvider = FutureProvider((ref) async {
 });
 
 final heatmapProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(dataRefreshProvider);
   final db = ref.watch(databaseProvider);
   return db.getHeatmapData(3);
 });
 
 final streaksProvider = FutureProvider.family((ref, String habitId) async {
+  ref.watch(dataRefreshProvider);
   final db = ref.watch(databaseProvider);
   final completions = await db.getCompletionsForHabit(habitId);
 
@@ -118,4 +142,39 @@ final streaksProvider = FutureProvider.family((ref, String habitId) async {
   }
 
   return {'current': current, 'longest': longest};
+});
+
+/// Provider for habit completion counts within a date range
+/// Returns a map of habitId -> count of unique days completed
+final habitCompletionCountsProvider = FutureProvider.family<Map<String, int>, DateTime>((ref, startDate) async {
+  ref.watch(dataRefreshProvider);
+  final db = ref.watch(databaseProvider);
+  final habits = await ref.watch(habitsProvider.future);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  final result = <String, int>{};
+  
+  for (final habit in habits) {
+    final completions = await db.getCompletionsForHabit(habit.id);
+    
+    // Count unique days within the date range
+    final uniqueDays = <String>{};
+    for (final completion in completions) {
+      final completionDate = DateTime(
+        completion.date.year,
+        completion.date.month,
+        completion.date.day,
+      );
+      
+      if (!completionDate.isBefore(startDate) && !completionDate.isAfter(today)) {
+        final dateStr = '${completionDate.year}-${completionDate.month.toString().padLeft(2, '0')}-${completionDate.day.toString().padLeft(2, '0')}';
+        uniqueDays.add(dateStr);
+      }
+    }
+    
+    result[habit.id] = uniqueDays.length;
+  }
+  
+  return result;
 });

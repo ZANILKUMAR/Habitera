@@ -17,13 +17,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
   bool _remindersRescheduled = false;
 
-  // Use late final to ensure screens are only created once
-  late final List<Widget> _screens = [
-    const TodayScreen(),
-    const CalendarScreen(),
-    const SettingsScreen(),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -48,11 +41,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the refresh provider to rebuild screens when data is cleared
+    final refreshKey = ref.watch(dataRefreshProvider);
+    
+    // Create screens with key so they rebuild when data changes
+    final screens = [
+      TodayScreen(key: ValueKey('today_$refreshKey')),
+      CalendarScreen(key: ValueKey('calendar_$refreshKey')),
+      const SettingsScreen(),
+    ];
+    
     return Scaffold(
       // Use IndexedStack to keep screens alive when switching tabs
       body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

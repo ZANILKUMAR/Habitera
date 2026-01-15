@@ -93,12 +93,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: _onAddHabit,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Habit'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -230,7 +229,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ],
                 ),
                 const SizedBox(width: 12),
-                SizedBox(
+                const SizedBox(
                   width: 48,
                   height: 48,
                   child: ProgressRing(

@@ -27,6 +27,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   late List<DateTime> _dates;
   Map<String, Set<String>> _completions = {}; // habitId -> set of date strings
   Map<String, Set<String>> _completionsWithNotes = {}; // habitId -> set of date strings that have notes
+  bool _notePromptOnTap = false; // Cached setting value
 
   // Fixed dimensions - prioritize habit name visibility
   static const double _habitColumnWidth = 160.0;
@@ -39,6 +40,20 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
     super.initState();
     _generateDates();
     _loadCompletions();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _db.getSettings();
+      if (mounted) {
+        setState(() {
+          _notePromptOnTap = settings.notePromptOnTap;
+        });
+      }
+    } catch (e) {
+      // Use default if error
+    }
   }
 
   @override
@@ -50,6 +65,8 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
         oldWidget.habits.map((h) => h.id).join(',')) {
       _loadCompletions();
     }
+    // Reload settings in case they changed
+    _loadSettings();
   }
 
   void _generateDates() {
@@ -83,16 +100,93 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
     }
   }
 
-  Future<void> _toggleCompletion(Habit habit, DateTime date) async {
+  /// Handles tap on a completion cell based on notePromptOnTap setting
+  Future<void> _onCompletionTap(Habit habit, DateTime date) async {
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final isCompleted = _completions[habit.id]?.contains(dateStr) ?? false;
 
     if (isCompleted) {
-      // If already completed, show options to edit notes or undo
+      // Check if this completion has notes
+      final hasNotes = _completionsWithNotes[habit.id]?.contains(dateStr) ?? false;
+      if (hasNotes) {
+        // Has notes - show options sheet to review/edit before unchecking
+        await _showCompletionOptionsSheet(habit.id, date, dateStr);
+      } else {
+        // No notes - quick undo without popup
+        await _quickUndo(habit.id, date, dateStr);
+      }
+    } else {
+      // If not completed, behavior depends on setting
+      if (_notePromptOnTap) {
+        // Tap opens notes popup
+        await _showAddCompletionSheet(habit, date, dateStr);
+      } else {
+        // Tap marks immediately
+        await _quickComplete(habit, date, dateStr);
+      }
+    }
+  }
+
+  /// Handles long-press on a completion cell based on notePromptOnTap setting
+  Future<void> _onCompletionLongPress(Habit habit, DateTime date) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final isCompleted = _completions[habit.id]?.contains(dateStr) ?? false;
+
+    if (isCompleted) {
+      // Always show options sheet on long-press to allow editing notes
       await _showCompletionOptionsSheet(habit.id, date, dateStr);
     } else {
-      // If not completed, show popup to add completion with optional notes
-      await _showAddCompletionSheet(habit, date, dateStr);
+      // If not completed, behavior depends on setting (opposite of tap)
+      if (_notePromptOnTap) {
+        // Long-press marks immediately (opposite of tap)
+        await _quickComplete(habit, date, dateStr);
+      } else {
+        // Long-press opens notes popup (opposite of tap)
+        await _showAddCompletionSheet(habit, date, dateStr);
+      }
+    }
+  }
+
+  /// Quick undo completion without showing popup
+  Future<void> _quickUndo(String habitId, DateTime date, String dateStr) async {
+    // Optimistic update
+    setState(() {
+      _completions[habitId]?.remove(dateStr);
+      _completionsWithNotes[habitId]?.remove(dateStr);
+    });
+
+    try {
+      await _db.undoCompletion(habitId, date);
+      ref.invalidate(dailyStatsProvider);
+      ref.invalidate(heatmapProvider);
+      ref.invalidate(completionStateProvider(habitId));
+    } catch (e) {
+      // Rollback on error
+      setState(() {
+        _completions[habitId] ??= {};
+        _completions[habitId]!.add(dateStr);
+      });
+    }
+  }
+
+  /// Quick complete without showing notes popup
+  Future<void> _quickComplete(Habit habit, DateTime date, String dateStr) async {
+    // Optimistic update
+    setState(() {
+      _completions[habit.id] ??= {};
+      _completions[habit.id]!.add(dateStr);
+    });
+
+    try {
+      await _db.recordCompletion(habit.id, date);
+      ref.invalidate(dailyStatsProvider);
+      ref.invalidate(heatmapProvider);
+      ref.invalidate(completionStateProvider(habit.id));
+    } catch (e) {
+      // Rollback on error
+      setState(() {
+        _completions[habit.id]!.remove(dateStr);
+      });
     }
   }
 
@@ -156,7 +250,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 Text(
                   DateFormat('EEEE, MMMM d').format(date),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 // Show reflective question if exists (stored as "QUESTION|||NOTES")
@@ -184,7 +278,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -200,7 +294,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                               child: Text(
                                 reflectiveQuestion,
                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -307,6 +401,8 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   Future<void> _showCompletionOptionsSheet(String habitId, DateTime date, String dateStr) async {
     // Load existing completion to get notes
     final completion = await _db.getCompletionForDate(habitId, date);
+    if (!mounted) return;
+    
     final notesController = TextEditingController(text: completion?.notes ?? '');
     
     final result = await showModalBottomSheet<String>(
@@ -364,7 +460,7 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
                 Text(
                   DateFormat('EEEE, MMMM d').format(date),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -499,6 +595,21 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    
+    // Watch the setting provider for reactive updates
+    final notePromptSetting = ref.watch(notePromptOnTapProvider);
+    notePromptSetting.whenData((value) {
+      if (_notePromptOnTap != value) {
+        // Use addPostFrameCallback to avoid setState during build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _notePromptOnTap = value;
+            });
+          }
+        });
+      }
+    });
 
     if (widget.habits.isEmpty) {
       return _buildEmptyState(theme);
@@ -715,7 +826,8 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
     final isToday = _isToday(date);
 
     return GestureDetector(
-      onTap: () => _toggleCompletion(habit, date),
+      onTap: () => _onCompletionTap(habit, date),
+      onLongPress: () => _onCompletionLongPress(habit, date),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -944,6 +1056,9 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
 
   @override
   Widget build(BuildContext context) {
+    // Add bottom padding to ensure content can scroll above the FAB
+    const bottomPadding = 80.0;
+    
     return Row(
       children: [
         // Fixed habit names column (vertical scroll synced with grid)
@@ -952,6 +1067,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
           child: ListView.builder(
             controller: _namesVerticalController,
             physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: bottomPadding),
             itemCount: widget.habits.length,
             itemBuilder: (context, index) {
               return widget.buildHabitNameCell(widget.habits[index]);
@@ -969,6 +1085,7 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
               child: ListView.builder(
                 controller: _gridVerticalController,
                 physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: bottomPadding),
                 itemCount: widget.habits.length,
                 itemBuilder: (context, index) {
                   return widget.buildHabitRow(widget.habits[index]);
