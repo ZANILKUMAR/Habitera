@@ -1128,8 +1128,8 @@ class _HabitGridState extends ConsumerState<HabitGrid> {
   }
 }
 
-/// A synchronized scroll grid widget that keeps habit names and completion cells
-/// perfectly aligned during horizontal scrolling and reordering
+/// A synchronized scroll grid widget that keeps habit names fixed
+/// while allowing horizontal scrolling of completion cells
 class _SyncedScrollGrid extends StatefulWidget {
   final ScrollController horizontalController;
   final ScrollController verticalController;
@@ -1159,19 +1159,30 @@ class _SyncedScrollGrid extends StatefulWidget {
 
 class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
   late ScrollController _gridHorizontalController;
-  late ScrollController _verticalController;
+  late ScrollController _namesVerticalController;
+  late ScrollController _gridVerticalController;
   bool _isSyncingHorizontal = false;
   bool _isSyncingFromHeader = false;
+  bool _isSyncingVerticalFromNames = false;
+  bool _isSyncingVerticalFromGrid = false;
+  
+  // Track drag state to hide grid items during drag animation
+  int? _draggingIndex;
 
   @override
   void initState() {
     super.initState();
     _gridHorizontalController = ScrollController();
-    _verticalController = ScrollController();
+    _namesVerticalController = ScrollController();
+    _gridVerticalController = ScrollController();
 
     // Sync horizontal scroll bidirectionally between header and body
     _gridHorizontalController.addListener(_onGridHorizontalScroll);
     widget.horizontalController.addListener(_onHeaderHorizontalScroll);
+    
+    // Sync vertical scroll between names column and grid column
+    _namesVerticalController.addListener(_onNamesVerticalScroll);
+    _gridVerticalController.addListener(_onGridVerticalScroll);
   }
 
   void _onGridHorizontalScroll() {
@@ -1196,12 +1207,37 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     _isSyncingFromHeader = false;
   }
 
+  void _onNamesVerticalScroll() {
+    if (_isSyncingVerticalFromNames || _isSyncingVerticalFromGrid) return;
+    _isSyncingVerticalFromNames = true;
+    
+    if (_gridVerticalController.hasClients) {
+      _gridVerticalController.jumpTo(_namesVerticalController.offset);
+    }
+    
+    _isSyncingVerticalFromNames = false;
+  }
+
+  void _onGridVerticalScroll() {
+    if (_isSyncingVerticalFromGrid || _isSyncingVerticalFromNames) return;
+    _isSyncingVerticalFromGrid = true;
+    
+    if (_namesVerticalController.hasClients) {
+      _namesVerticalController.jumpTo(_gridVerticalController.offset);
+    }
+    
+    _isSyncingVerticalFromGrid = false;
+  }
+
   @override
   void dispose() {
     _gridHorizontalController.removeListener(_onGridHorizontalScroll);
     widget.horizontalController.removeListener(_onHeaderHorizontalScroll);
+    _namesVerticalController.removeListener(_onNamesVerticalScroll);
+    _gridVerticalController.removeListener(_onGridVerticalScroll);
     _gridHorizontalController.dispose();
-    _verticalController.dispose();
+    _namesVerticalController.dispose();
+    _gridVerticalController.dispose();
     super.dispose();
   }
 
@@ -1211,83 +1247,94 @@ class _SyncedScrollGridState extends State<_SyncedScrollGrid> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Build a single unified list where each row contains habit name + scrollable completions
-    // This ensures drag-and-drop moves the entire row together without flickering
-    
-    Widget buildFullRow(Habit habit) {
-      return Row(
-        children: [
-          // Fixed habit name cell
-          SizedBox(
-            width: widget.habitColumnWidth,
-            child: widget.buildHabitNameCell(habit),
-          ),
-          // Completion cells (will be clipped by parent's horizontal scroll)
-          widget.buildHabitRow(habit),
-        ],
-      );
-    }
-    
-    if (widget.onReorder != null) {
-      // Use ReorderableListView with full rows to prevent flickering
-      return SingleChildScrollView(
-        controller: _gridHorizontalController,
-        scrollDirection: Axis.horizontal,
-        physics: const ClampingScrollPhysics(),
-        child: SizedBox(
-          width: widget.habitColumnWidth + widget.scrollableWidth,
-          child: ReorderableListView.builder(
-            scrollController: _verticalController,
+    // Two-column layout: fixed habit names on left, scrollable completions on right
+    // Both columns must rebuild together when habits list changes to stay in sync
+    return Row(
+      children: [
+        // Fixed habit names column (with drag-to-reorder)
+        SizedBox(
+          width: widget.habitColumnWidth,
+          child: widget.onReorder != null
+              ? ReorderableListView.builder(
+                  scrollController: _namesVerticalController,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: bottomPadding),
+                  itemCount: widget.habits.length,
+                  buildDefaultDragHandles: false,
+                  onReorderStart: (index) {
+                    setState(() {
+                      _draggingIndex = index;
+                    });
+                  },
+                  onReorderEnd: (index) {
+                    setState(() {
+                      _draggingIndex = null;
+                    });
+                  },
+                  onReorder: widget.onReorder!,
+                  proxyDecorator: (child, index, animation) {
+                    return Material(
+                      elevation: 4,
+                      color: isDark 
+                          ? theme.colorScheme.surfaceContainerHighest
+                          : theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.3),
+                      child: child,
+                    );
+                  },
+                  itemBuilder: (context, index) {
+                    final habit = widget.habits[index];
+                    return ReorderableDelayedDragStartListener(
+                      key: ValueKey('name_${habit.id}'),
+                      index: index,
+                      child: widget.buildHabitNameCell(habit),
+                    );
+                  },
+                )
+              : ListView.builder(
+                  controller: _namesVerticalController,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: bottomPadding),
+                  itemCount: widget.habits.length,
+                  itemBuilder: (context, index) {
+                    return KeyedSubtree(
+                      key: ValueKey('name_${widget.habits[index].id}'),
+                      child: widget.buildHabitNameCell(widget.habits[index]),
+                    );
+                  },
+                ),
+        ),
+        // Horizontally scrollable completion grid (synced vertically with names column)
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _gridHorizontalController,
+            scrollDirection: Axis.horizontal,
             physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: bottomPadding),
-            itemCount: widget.habits.length,
-            buildDefaultDragHandles: false,
-            onReorder: widget.onReorder!,
-            proxyDecorator: (child, index, animation) {
-              return Material(
-                elevation: 4,
-                color: isDark 
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(8),
-                shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.3),
-                child: child,
-              );
-            },
-            itemBuilder: (context, index) {
-              final habit = widget.habits[index];
-              return ReorderableDelayedDragStartListener(
-                key: ValueKey(habit.id),
-                index: index,
-                child: buildFullRow(habit),
-              );
-            },
+            child: SizedBox(
+              width: widget.scrollableWidth,
+              child: ListView.builder(
+                controller: _gridVerticalController,
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: bottomPadding),
+                itemCount: widget.habits.length,
+                itemBuilder: (context, index) {
+                  final habit = widget.habits[index];
+                  // Make the grid row semi-transparent when its name is being dragged
+                  final isDragging = _draggingIndex == index;
+                  return KeyedSubtree(
+                    key: ValueKey('grid_${habit.id}'),
+                    child: Opacity(
+                      opacity: isDragging ? 0.3 : 1.0,
+                      child: widget.buildHabitRow(habit),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         ),
-      );
-    } else {
-      // Non-reorderable version
-      return SingleChildScrollView(
-        controller: _gridHorizontalController,
-        scrollDirection: Axis.horizontal,
-        physics: const ClampingScrollPhysics(),
-        child: SizedBox(
-          width: widget.habitColumnWidth + widget.scrollableWidth,
-          child: ListView.builder(
-            controller: _verticalController,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: bottomPadding),
-            itemCount: widget.habits.length,
-            itemBuilder: (context, index) {
-              final habit = widget.habits[index];
-              return KeyedSubtree(
-                key: ValueKey(habit.id),
-                child: buildFullRow(habit),
-              );
-            },
-          ),
-        ),
-      );
-    }
+      ],
+    );
   }
 }

@@ -375,11 +375,13 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                   child: TextField(
                     controller: titleController,
                     autofocus: existingHabit == null,
+                    maxLength: 50,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Habit name',
+                      counterText: '',
                       hintStyle: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant
                             .withValues(alpha: 0.6),
@@ -412,12 +414,14 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
                 child: Center(
                   child: TextField(
                     controller: questionController,
+                    maxLength: 100,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface,
                       fontStyle: FontStyle.italic,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Add a reflective question (optional)',
+                      counterText: '',
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant
                             .withValues(alpha: 0.6),
@@ -707,8 +711,10 @@ class _AddHabitScreenState extends ConsumerState<AddHabitScreen> {
           ),
           child: TextField(
             controller: descriptionController,
+            maxLength: 150,
             decoration: InputDecoration(
               hintText: 'Add a note (optional)',
+              counterText: '',
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 color:
                     theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),

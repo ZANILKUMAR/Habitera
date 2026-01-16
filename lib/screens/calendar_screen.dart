@@ -205,7 +205,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               isDark,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: _buildStatCard(
               '⭐',
@@ -216,7 +216,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               isDark,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: _buildStatCard(
               '📈',
@@ -235,7 +235,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _buildStatCard(String emoji, String value, String label, Color color,
       ThemeData theme, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -245,27 +245,27 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: color.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 8),
+          Text(emoji, style: const TextStyle(fontSize: 18)),
+          const SizedBox(height: 4),
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
-          const SizedBox(height: 2),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 10,
             ),
             textAlign: TextAlign.center,
           ),
