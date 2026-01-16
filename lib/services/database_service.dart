@@ -147,7 +147,7 @@ class DatabaseService {
       {
         'id': 'default_wake_early',
         'title': 'Wake Up Early',
-        'description': 'Start your day at 6 AM for a productive morning',
+        'description': 'Did you wake up before 6 AM?|||Start your day at 6 AM for a productive morning',
         'frequency': 'daily',
         'color': '#FFA94D',
         'icon': '🌅',
@@ -156,7 +156,7 @@ class DatabaseService {
       {
         'id': 'default_exercise',
         'title': 'Exercise',
-        'description': 'At least 30 minutes of physical activity',
+        'description': 'Did you exercise for at least 30 minutes?|||At least 30 minutes of physical activity',
         'frequency': 'daily',
         'color': '#FF6B6B',
         'icon': '💪',
@@ -165,7 +165,7 @@ class DatabaseService {
       {
         'id': 'default_meditate',
         'title': 'Meditate',
-        'description': '10 minutes of mindfulness meditation',
+        'description': 'Did you meditate for 10 minutes?|||10 minutes of mindfulness meditation',
         'frequency': 'daily',
         'color': '#4ECDC4',
         'icon': '🧘',
@@ -174,7 +174,7 @@ class DatabaseService {
       {
         'id': 'default_read',
         'title': 'Read a Book',
-        'description': 'Read for at least 20 minutes',
+        'description': 'Did you read for at least 20 minutes?|||Read for at least 20 minutes',
         'frequency': 'daily',
         'color': '#9B59B6',
         'icon': '📚',
@@ -183,7 +183,7 @@ class DatabaseService {
       {
         'id': 'default_water',
         'title': 'Drink Water',
-        'description': 'Stay hydrated - drink 8 glasses of water',
+        'description': 'Did you drink 8 glasses of water today?|||Stay hydrated - drink 8 glasses of water',
         'frequency': 'daily',
         'color': '#3498DB',
         'icon': '💧',
@@ -192,7 +192,7 @@ class DatabaseService {
       {
         'id': 'default_journal',
         'title': 'Journal',
-        'description': 'Write down your thoughts and gratitude',
+        'description': 'Did you write in your journal today?|||Write down your thoughts and gratitude',
         'frequency': 'daily',
         'color': '#FFD93D',
         'icon': '📝',
