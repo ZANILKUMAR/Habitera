@@ -476,7 +476,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Card
+              // Header Card (with highlights inside)
               _buildHeaderCard(habit, habitColor, theme, isDark),
               const SizedBox(height: 20),
 
@@ -492,9 +492,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               _buildVisualHistory(theme, isDark),
               const SizedBox(height: 20),
 
-              // Streak Stats
-              _buildStreakSection(theme, isDark),
-              const SizedBox(height: 20),
+
 
               // Weekly Pattern (Frequency Chart)
               _buildFrequencyChartSection(habitColor, theme, isDark),
@@ -502,10 +500,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
 
               // Frequency Dot Matrix Chart
               _buildFrequencyDotMatrixSection(habitColor, theme, isDark),
-              const SizedBox(height: 20),
-
-              // Highlights Section
-              _buildHighlightsSection(theme, isDark),
               const SizedBox(height: 32),
 
               // Action Buttons
@@ -520,8 +514,11 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
 
   Widget _buildHeaderCard(
       Habit habit, Color habitColor, ThemeData theme, bool isDark) {
+    // Generate highlights
+    final highlights = _getHighlights();
+    
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -531,7 +528,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: habitColor.withValues(alpha: 0.3),
           width: 1,
@@ -541,221 +538,191 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (habit.icon != null)
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: habitColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child:
-                      Text(habit.icon!, style: const TextStyle(fontSize: 28)),
+                      Text(habit.icon!, style: const TextStyle(fontSize: 24)),
                 ),
-              if (habit.icon != null) const SizedBox(width: 16),
+              if (habit.icon != null) const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       habit.title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (habit.description != null &&
-                        habit.description!.isNotEmpty)
-                      Padding(
+                    // Parse description - show only notes (not reflective question)
+                    Builder(builder: (context) {
+                      if (habit.description == null || habit.description!.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      String? notes;
+                      
+                      if (habit.description!.contains('|||')) {
+                        final parts = habit.description!.split('|||');
+                        if (parts.length > 1 && parts[1].isNotEmpty) {
+                          notes = parts[1];
+                        }
+                      } else {
+                        // No separator, treat as notes
+                        notes = habit.description!;
+                      }
+                      
+                      if (notes == null || notes.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      return Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          habit.description!,
+                          notes,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.7),
                           ),
                         ),
-                      ),
+                      );
+                    }),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Consistency Score
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniStat(
-                  '${_consistencyScore.round()}%',
-                  'Consistency',
-                  Icons.trending_up_rounded,
-                  habitColor,
-                  theme,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMiniStat(
-                  '$_totalCompletions',
-                  'Total Check-ins',
-                  Icons.check_circle_outline_rounded,
-                  habitColor,
-                  theme,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniStat(
-                  '$_thisWeekCompletions',
-                  'This Week',
-                  Icons.view_week_rounded,
-                  habitColor,
-                  theme,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMiniStat(
-                  '$_thisMonthCompletions',
-                  'This Month',
-                  Icons.calendar_month_rounded,
-                  habitColor,
-                  theme,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniStat(
-      String value, String label, IconData icon, Color color, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
+              // Streak stats on the right - stacked boxes
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Current streak box
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🔥', style: TextStyle(fontSize: 12)),
+                        Text(
+                          '$_currentStreak ${_currentStreak == 1 ? 'day' : 'days'}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  // Best streak box
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.amber.shade600.withValues(alpha: 0.4),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🏆', style: TextStyle(fontSize: 12)),
+                        Text(
+                          '$_longestStreak ${_longestStreak == 1 ? 'day' : 'days'}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber.shade600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStreakSection(ThemeData theme, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Streaks',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStreakCard(
-                _currentStreak,
-                'Current Streak',
-                '🔥',
-                theme.colorScheme.primary,
-                theme,
-                isDark,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStreakCard(
-                _longestStreak,
-                'Best Streak',
-                '🏆',
-                Colors.amber.shade600,
-                theme,
-                isDark,
-              ),
+          // Highlights (compact inline)
+          if (highlights.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: highlights.map((h) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: habitColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(h['emoji'] as String, style: const TextStyle(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    Text(
+                      h['title'] as String,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
             ),
           ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStreakCard(int days, String label, String emoji, Color color,
-      ThemeData theme, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.3),
-        ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 8),
-          Text(
-            '$days',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          Text(
-            days == 1 ? 'day' : 'days',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
         ],
       ),
     );
+  }
+
+  /// Get highlights based on stats
+  List<Map<String, dynamic>> _getHighlights() {
+    final highlights = <Map<String, dynamic>>[];
+
+    if (_currentStreak >= 7) {
+      highlights.add({'emoji': '🔥', 'title': 'On Fire! $_currentStreak day streak'});
+    } else if (_currentStreak >= 3) {
+      highlights.add({'emoji': '⚡', 'title': 'Building Momentum - $_currentStreak days'});
+    }
+
+    if (_longestStreak >= 30) {
+      highlights.add({'emoji': '🏆', 'title': 'Monthly Master - Best: $_longestStreak days'});
+    } else if (_longestStreak >= 7) {
+      highlights.add({'emoji': '⭐', 'title': 'Week Warrior - Best: $_longestStreak days'});
+    }
+
+    if (_totalCompletions >= 100) {
+      highlights.add({'emoji': '💯', 'title': 'Century Club - $_totalCompletions check-ins'});
+    } else if (_totalCompletions >= 50) {
+      highlights.add({'emoji': '🎯', 'title': 'Dedicated - $_totalCompletions check-ins'});
+    }
+
+    if (_consistencyScore >= 80) {
+      highlights.add({'emoji': '🌟', 'title': 'Highly Consistent - ${_consistencyScore.round()}%'});
+    }
+
+    if (highlights.isEmpty) {
+      highlights.add({'emoji': '🌱', 'title': 'Just Getting Started'});
+    }
+
+    return highlights;
   }
 
   Widget _buildVisualHistory(ThemeData theme, bool isDark) {
@@ -1921,27 +1888,43 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
         ? (_thisWeekCompletions / expectedPerWeek * 100).clamp(0, 100)
         : 0.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Schedule',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+    // Parse reflective question from description (only if separator exists)
+    String? reflectiveQuestion;
+    if (habit.description != null && habit.description!.isNotEmpty) {
+      if (habit.description!.contains('|||')) {
+        final parts = habit.description!.split('|||');
+        if (parts[0].isNotEmpty) {
+          reflectiveQuestion = parts[0];
+        }
+      }
+      // If no separator, don't show anything - it's just notes
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.3),
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? theme.colorScheme.surface : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Column(
-            children: [
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Reflective question at the top (if exists)
+          if (reflectiveQuestion != null && reflectiveQuestion.isNotEmpty) ...[
+                Text(
+                  reflectiveQuestion,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // Frequency and Reminder row
               Row(
                 children: [
@@ -2016,9 +1999,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
               ),
             ],
           ),
-        ),
-      ],
-    );
+        );
   }
 
   String _formatReminderTime(String reminderTime) {
@@ -2032,122 +2013,6 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     } catch (e) {
       return reminderTime;
     }
-  }
-
-  Widget _buildHighlightsSection(ThemeData theme, bool isDark) {
-    final highlights = <Map<String, dynamic>>[];
-
-    // Add achievements based on stats
-    if (_currentStreak >= 7) {
-      highlights.add({
-        'emoji': '🔥',
-        'title': 'On Fire!',
-        'subtitle': '$_currentStreak day streak going strong',
-      });
-    } else if (_currentStreak >= 3) {
-      highlights.add({
-        'emoji': '⚡',
-        'title': 'Building Momentum',
-        'subtitle': '$_currentStreak days in a row',
-      });
-    }
-
-    if (_longestStreak >= 30) {
-      highlights.add({
-        'emoji': '🏆',
-        'title': 'Monthly Master',
-        'subtitle': 'Best streak: $_longestStreak days',
-      });
-    } else if (_longestStreak >= 7) {
-      highlights.add({
-        'emoji': '⭐',
-        'title': 'Week Warrior',
-        'subtitle': 'Best streak: $_longestStreak days',
-      });
-    }
-
-    if (_totalCompletions >= 100) {
-      highlights.add({
-        'emoji': '💯',
-        'title': 'Century Club',
-        'subtitle': '$_totalCompletions total check-ins',
-      });
-    } else if (_totalCompletions >= 50) {
-      highlights.add({
-        'emoji': '🎯',
-        'title': 'Dedicated',
-        'subtitle': '$_totalCompletions check-ins so far',
-      });
-    }
-
-    if (_consistencyScore >= 80) {
-      highlights.add({
-        'emoji': '🌟',
-        'title': 'Highly Consistent',
-        'subtitle': '${_consistencyScore.round()}% consistency this month',
-      });
-    }
-
-    if (highlights.isEmpty) {
-      highlights.add({
-        'emoji': '🌱',
-        'title': 'Just Getting Started',
-        'subtitle': 'Keep going to unlock achievements',
-      });
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Highlights',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...highlights.map((h) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? theme.colorScheme.surface : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: theme.dividerColor.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(h['emoji'] as String,
-                        style: const TextStyle(fontSize: 24)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            h['title'] as String,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            h['subtitle'] as String,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )),
-      ],
-    );
   }
 
   Widget _buildActionButtons(ThemeData theme) {
@@ -2378,12 +2243,12 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: isDark ? theme.colorScheme.surface : Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: theme.dividerColor.withValues(alpha: 0.3),
             ),
@@ -2402,7 +2267,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                       isDark,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _buildHistoryStatCard(
                       'Last Week',
@@ -2415,7 +2280,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -2428,7 +2293,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                       isDark,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _buildHistoryStatCard(
                       'This Quarter',
@@ -2441,7 +2306,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -2454,7 +2319,7 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
                       isDark,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _buildHistoryStatCard(
                       'All Time',
@@ -2483,41 +2348,34 @@ class _HabitDetailsScreenState extends ConsumerState<HabitDetailsScreen> {
     bool isDark,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   label,
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            count.toString(),
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            count == 1 ? 'completion' : 'completions',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                Text(
+                  '$count',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
