@@ -151,7 +151,7 @@ class DatabaseService {
         'frequency': 'daily',
         'color': '#FFA94D',
         'icon': '🌅',
-        'reminderTime': '06:00',
+        'reminderTime': null,
       },
       {
         'id': 'default_exercise',
@@ -160,7 +160,7 @@ class DatabaseService {
         'frequency': 'daily',
         'color': '#FF6B6B',
         'icon': '💪',
-        'reminderTime': '07:00',
+        'reminderTime': null,
       },
       {
         'id': 'default_meditate',
@@ -169,7 +169,7 @@ class DatabaseService {
         'frequency': 'daily',
         'color': '#4ECDC4',
         'icon': '🧘',
-        'reminderTime': '08:00',
+        'reminderTime': null,
       },
       {
         'id': 'default_read',
@@ -196,7 +196,7 @@ class DatabaseService {
         'frequency': 'daily',
         'color': '#FFD93D',
         'icon': '📝',
-        'reminderTime': '21:00',
+        'reminderTime': null,
       },
     ];
 
