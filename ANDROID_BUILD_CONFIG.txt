@@ -1,0 +1,421 @@
+================================================================================
+              HABITERA - ANDROID BUILD CONFIGURATION CHECKLIST
+                    All Files That Need Changes Before Build
+================================================================================
+
+This file lists EXACTLY which files need to be modified and what to change.
+
+
+================================================================================
+                              FILE 1: pubspec.yaml
+================================================================================
+
+Location: D:\NEW_PROJECTS\Habitera\pubspec.yaml
+
+CURRENT:
+────────────────────────────────────────────────────────────────────────────
+name: habitera
+description: "Build habits. Shape your life. - Offline-first habit tracking app"
+publish_to: 'none'
+
+version: 1.0.0+1
+────────────────────────────────────────────────────────────────────────────
+
+VERIFY:
+  ✓ version: 1.0.0+1  (Correct for first release)
+  ✓ name: habitera    (OK, internal name only)
+
+ACTION: ✓ NO CHANGE NEEDED (ready as-is)
+
+
+================================================================================
+                            FILE 2: key.properties
+================================================================================
+
+Location: D:\NEW_PROJECTS\Habitera\android\key.properties
+
+CURRENT (TEMPLATE):
+────────────────────────────────────────────────────────────────────────────
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=habitera_release_key
+storeFile=habitera_release.jks
+────────────────────────────────────────────────────────────────────────────
+
+CHANGE TO (After creating keystore):
+────────────────────────────────────────────────────────────────────────────
+storePassword=[YOUR_KEYSTORE_PASSWORD_HERE]
+keyPassword=[YOUR_KEY_PASSWORD_HERE]
+keyAlias=habitera_release_key
+storeFile=habitera_release.jks
+────────────────────────────────────────────────────────────────────────────
+
+STEPS:
+  1. First, create keystore (see APP_BUNDLE_SETTINGS.txt - STEP 1)
+  2. Then fill in the passwords you entered during keystore creation
+
+ACTION: ⚠️ UPDATE REQUIRED (after keystore creation)
+
+
+================================================================================
+                    FILE 3: android/app/build.gradle.kts
+================================================================================
+
+Location: D:\NEW_PROJECTS\Habitera\android\app\build.gradle.kts
+
+CURRENT:
+────────────────────────────────────────────────────────────────────────────
+    defaultConfig {
+        applicationId = "com.example.habitera"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        multiDexEnabled = true
+    }
+────────────────────────────────────────────────────────────────────────────
+
+CHANGE applicationId FROM:
+    "com.example.habitera"
+
+CHANGE applicationId TO:
+    "com.yourcompany.habitera"
+
+EXAMPLES:
+    "com.mycompany.habitera"
+    "com.myname.habitera"
+    "io.github.username.habitera"
+    "com.mydomain.habitera"
+
+⚠️  IMPORTANT:
+    • Must be UNIQUE (no other app has this name)
+    • Lowercase only
+    • No spaces
+    • Cannot start with number
+    • Cannot be changed after first release!
+
+ACTION: ⚠️ UPDATE REQUIRED (change package name)
+
+
+================================================================================
+                FILE 4: android/app/src/main/AndroidManifest.xml
+================================================================================
+
+Location: D:\NEW_PROJECTS\Habitera\android\app\src\main\AndroidManifest.xml
+
+CURRENT (Line 1):
+────────────────────────────────────────────────────────────────────────────
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+────────────────────────────────────────────────────────────────────────────
+
+CHANGE TO:
+────────────────────────────────────────────────────────────────────────────
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.yourcompany.habitera">
+────────────────────────────────────────────────────────────────────────────
+
+SPECIFIC CHANGE:
+    Add: package="com.yourcompany.habitera"
+    After: xmlns:android="http://schemas.android.com/apk/res/android"
+
+ACTION: ⚠️ UPDATE REQUIRED (add package attribute)
+
+
+================================================================================
+                    FILE 5: android/app/build.gradle.kts (Signing)
+================================================================================
+
+Location: D:\NEW_PROJECTS\Habitera\android\app/build.gradle.kts
+
+CURRENT (Should already be configured):
+────────────────────────────────────────────────────────────────────────────
+    // Load signing configuration from key.properties
+    signingConfigs {
+        create("release") {
+            val keyPropertiesFile = rootProject.file("key.properties")
+            if (keyPropertiesFile.exists()) {
+                val keyProperties = Properties()
+                keyProperties.load(FileInputStream(keyPropertiesFile))
+                
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+────────────────────────────────────────────────────────────────────────────
+
+VERIFY:
+    ✓ signingConfigs exists
+    ✓ loads from key.properties
+    ✓ release config set up
+
+ACTION: ✓ ALREADY CONFIGURED (no change needed)
+
+
+================================================================================
+                          ADDITIONAL FILES (Optional)
+================================================================================
+
+These files exist but have CORRECT default values:
+
+1. android/app/src/debug/AndroidManifest.xml
+   Status: ✓ Correct (debug/test file)
+   Action: ℹ️ No change needed
+
+2. android/app/src/profile/AndroidManifest.xml
+   Status: ✓ Correct (profile/test file)
+   Action: ℹ️ No change needed
+
+3. android/.gitignore
+   Status: ✓ Correct (protects secrets)
+   Action: ✓ Already configured
+
+4. android/build.gradle.kts
+   Status: ✓ Correct (project config)
+   Action: ℹ️ No change needed
+
+
+================================================================================
+                        QUICK REFERENCE: WHAT TO CHANGE
+================================================================================
+
+FILES TO MODIFY BEFORE BUILDING:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. PRIORITY: HIGH - Must do before build!                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ File: android/key.properties                                            │
+│ What: Fill in keystore passwords                                        │
+│ When: After creating keystore                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. PRIORITY: HIGH - Change package name                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│ File: android/app/build.gradle.kts                                      │
+│ Line: ~25 (applicationId)                                               │
+│ From: "com.example.habitera"                                            │
+│ To:   "com.yourcompany.habitera"                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PRIORITY: HIGH - Add package to manifest                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ File: android/app/src/main/AndroidManifest.xml                          │
+│ Line: 1                                                                 │
+│ Add:  package="com.yourcompany.habitera"                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. PRIORITY: OPTIONAL - Change version if not first release             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ File: pubspec.yaml                                                      │
+│ Line: ~5 (version)                                                      │
+│ Current: 1.0.0+1 (OK for first release)                                 │
+│ Future:  1.0.1+2 (for updates)                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                      STEP-BY-STEP MODIFICATION GUIDE
+================================================================================
+
+STEP 1: Create Keystore
+────────────────────────────────────────────────────────────────────────────
+Command:
+  cd D:\NEW_PROJECTS\Habitera\android
+  keytool -genkey -v -keystore habitera_release.jks `
+    -keyalg RSA -keysize 2048 -validity 10000 `
+    -alias habitera_release_key
+
+Enter these values when prompted:
+  ? Keystore password: __________________ (remember this!)
+  ? Key password: __________________ (same or different)
+  ? First and last name: Your Name
+  ? Organizational unit: Engineering
+  ? Organization: Your Company
+  ? City or Locality: Your City
+  ? State or Province: Your State
+  ? Country code: US (or your country)
+
+Result: Creates file: D:\NEW_PROJECTS\Habitera\android\habitera_release.jks
+
+
+STEP 2: Update key.properties
+────────────────────────────────────────────────────────────────────────────
+File: D:\NEW_PROJECTS\Habitera\android\key.properties
+
+Replace:
+    storePassword=YOUR_STORE_PASSWORD
+With:
+    storePassword=THE_PASSWORD_YOU_ENTERED_IN_STEP_1
+
+Replace:
+    keyPassword=YOUR_KEY_PASSWORD
+With:
+    keyPassword=THE_KEY_PASSWORD_YOU_ENTERED_IN_STEP_1
+
+Keep these unchanged:
+    keyAlias=habitera_release_key
+    storeFile=habitera_release.jks
+
+
+STEP 3: Update Package Name in build.gradle.kts
+────────────────────────────────────────────────────────────────────────────
+File: D:\NEW_PROJECTS\Habitera\android\app\build.gradle.kts
+
+Line ~25:
+    applicationId = "com.example.habitera"
+
+Change to:
+    applicationId = "com.mycompany.habitera"
+
+DECIDE YOUR PACKAGE NAME:
+  ☐ com.mycompany.habitera
+  ☐ com.myname.habitera
+  ☐ io.github.myusername.habitera
+  ☐ ____________________
+
+⚠️  Use your chosen package name everywhere!
+
+
+STEP 4: Update Package in AndroidManifest.xml
+────────────────────────────────────────────────────────────────────────────
+File: D:\NEW_PROJECTS\Habitera\android\app\src\main\AndroidManifest.xml
+
+Line 1 - Change from:
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+Change to:
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        package="com.mycompany.habitera">
+
+(Use SAME package name as Step 3!)
+
+
+STEP 5: Verify Version (Optional)
+────────────────────────────────────────────────────────────────────────────
+File: D:\NEW_PROJECTS\Habitera\pubspec.yaml
+
+Line ~5:
+    version: 1.0.0+1
+
+✓ OK for first release
+Change ONLY if releasing an update:
+    1.0.1+2 (for first update/bug fix)
+    1.0.2+3 (for second update)
+    etc.
+
+RULE: Both numbers must ALWAYS increase
+
+
+================================================================================
+                          FINAL PRE-BUILD CHECKLIST
+================================================================================
+
+Before running: flutter build appbundle --release
+
+☐ Keystore created
+  Location: D:\NEW_PROJECTS\Habitera\android\habitera_release.jks
+  Status: [check folder to verify file exists]
+
+☐ key.properties filled
+  File: D:\NEW_PROJECTS\Habitera\android\key.properties
+  Passwords: [filled in]
+  Test: Try to open and verify passwords are there
+
+☐ Package name updated
+  File: android/app/build.gradle.kts
+  Change: applicationId = "YOUR_PACKAGE"
+  Verify: [check file content]
+
+☐ Package added to manifest
+  File: android/app/src/main/AndroidManifest.xml
+  Change: package="YOUR_PACKAGE"
+  Verify: [check file content]
+
+☐ Version verified
+  File: pubspec.yaml
+  Value: version: 1.0.0+1 (or your chosen version)
+  Status: [checked]
+
+☐ Code quality checked
+  Command: flutter analyze
+  Status: [0 errors]
+
+☐ Flutter clean done
+  Command: flutter clean
+  Status: [completed]
+
+☐ Dependencies updated
+  Command: flutter pub get
+  Status: [completed]
+
+
+================================================================================
+                        EXACTLY WHICH COMMANDS TO RUN
+================================================================================
+
+OPEN POWERSHELL AND RUN IN ORDER:
+
+────────────────────────────────────────────────────────────────────────────
+Step 1: Navigate to project
+────────────────────────────────────────────────────────────────────────────
+cd D:\NEW_PROJECTS\Habitera
+
+
+────────────────────────────────────────────────────────────────────────────
+Step 2: Create keystore (ONE TIME ONLY)
+────────────────────────────────────────────────────────────────────────────
+cd android
+keytool -genkey -v -keystore habitera_release.jks `
+  -keyalg RSA -keysize 2048 -validity 10000 `
+  -alias habitera_release_key
+
+[Enter your details when prompted]
+
+
+────────────────────────────────────────────────────────────────────────────
+Step 3: Update configuration files
+────────────────────────────────────────────────────────────────────────────
+[Edit these files with your text editor:]
+  1. key.properties (add passwords)
+  2. android/app/build.gradle.kts (update applicationId)
+  3. android/app/src/main/AndroidManifest.xml (add package)
+
+
+────────────────────────────────────────────────────────────────────────────
+Step 4: Clean and prepare
+────────────────────────────────────────────────────────────────────────────
+cd D:\NEW_PROJECTS\Habitera
+
+flutter clean
+flutter pub get
+
+
+────────────────────────────────────────────────────────────────────────────
+Step 5: Verify quality
+────────────────────────────────────────────────────────────────────────────
+flutter analyze
+flutter test
+
+
+────────────────────────────────────────────────────────────────────────────
+Step 6: Build app bundle
+────────────────────────────────────────────────────────────────────────────
+flutter build appbundle --release
+
+[Wait 3-5 minutes for build to complete]
+
+OUTPUT: ✓ BUILD SUCCESSFUL
+        File: build/app/outputs/bundle/release/app-release.aab
+
+
+================================================================================
+
+Date Created: January 18, 2026
+Project: Habitera v1.0.0+1
+Status: Ready for Configuration
+
+Next: Follow the steps above, then run build command!
+
+================================================================================

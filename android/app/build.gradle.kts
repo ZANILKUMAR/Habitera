@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.*
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.habitera"
+    namespace = "com.habitera.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +23,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.habitera"
+        applicationId = "com.habitera.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -28,9 +31,32 @@ android {
         multiDexEnabled = true
     }
 
+    // Load signing configuration from key.properties
+    signingConfigs {
+        create("release") {
+            val keyPropertiesFile = file("../key.properties")
+            if (keyPropertiesFile.exists()) {
+                val keyProperties = Properties()
+                keyProperties.load(FileInputStream(keyPropertiesFile))
+                
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+                storeFile = file("../${keyProperties.getProperty("storeFile")}")
+                storePassword = keyProperties.getProperty("storePassword")
+            } else {
+                println("WARNING: key.properties not found. Using debug signing.")
+                // Fallback to debug signing if key.properties doesn't exist
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             // Disable minification to prevent flutter_local_notifications issues
             isMinifyEnabled = false
             isShrinkResources = false

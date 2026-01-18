@@ -1,0 +1,511 @@
+================================================================================
+                    HABITERA - APP BUNDLE CONFIGURATION
+                         Complete Settings Guide
+================================================================================
+
+This file contains ALL the settings you need to configure before building the
+app bundle for Google Play Store. Fill in this information BEFORE building.
+
+================================================================================
+                              STEP-BY-STEP SETUP
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: GENERATE SIGNING KEYSTORE (ONE TIME ONLY)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Location: D:\NEW_PROJECTS\Habitera\android\
+
+Run this command in PowerShell:
+────────────────────────────────────────────────────────────────────────────
+cd D:\NEW_PROJECTS\Habitera\android
+
+keytool -genkey -v -keystore habitera_release.jks `
+  -keyalg RSA -keysize 2048 -validity 10000 `
+  -alias habitera_release_key
+────────────────────────────────────────────────────────────────────────────
+
+When prompted, enter these details:
+
+📝 KEYSTORE GENERATION DETAILS (Save this!)
+─────────────────────────────────────────────────────────────────────────────
+Keystore Password:           ___________________________________________
+Key Password:                ___________________________________________
+First and Last Name:         ___________________________________________
+Organizational Unit (OU):    ___________________________________________
+Organization (O):            ___________________________________________
+City or Locality (L):        ___________________________________________
+State or Province (S):       ___________________________________________
+Country Code (C):            ___________________________________________
+(2-letter code, e.g., US, IN, GB)
+
+Example for India:
+  Name: John Doe
+  OU: Engineering
+  O: My Company
+  L: Bangalore
+  S: Karnataka
+  C: IN
+─────────────────────────────────────────────────────────────────────────────
+
+⚠️  IMPORTANT: Save these passwords securely! You'll need them for every release.
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: CONFIGURE SIGNING CREDENTIALS                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+File: D:\NEW_PROJECTS\Habitera\android\key.properties
+
+FILL IN THE FOLLOWING WITH YOUR KEYSTORE DETAILS:
+─────────────────────────────────────────────────────────────────────────────
+storePassword=___________________________________________
+keyPassword=___________________________________________
+keyAlias=habitera_release_key
+storeFile=habitera_release.jks
+─────────────────────────────────────────────────────────────────────────────
+
+Copy the passwords from Step 1 above.
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: UPDATE APP PACKAGE NAME (IMPORTANT!)                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️  CHANGE FROM DEFAULT "com.example.habitera" to YOUR UNIQUE PACKAGE NAME
+
+Current Package: com.example.habitera
+Your Package:    ___________________________________________
+
+Format: com.yourcompany.appname
+Examples:
+  - com.mycompany.habitera
+  - com.mydomain.habitera
+  - com.myname.habitera
+  - io.github.username.habitera
+
+MUST be:
+  ✓ Unique (no other app has this name)
+  ✓ Lowercase
+  ✓ Only contain letters, numbers, underscores, dots
+  ✓ Cannot start with a number
+  ✓ Cannot be changed after first release!
+
+FILES TO UPDATE WITH NEW PACKAGE NAME:
+────────────────────────────────────────────────────────────────────────────
+1. android/app/build.gradle.kts
+   Line ~25: applicationId = "YOUR_PACKAGE_HERE"
+
+2. android/app/src/main/AndroidManifest.xml
+   Line 1: <manifest xmlns:android="..." package="YOUR_PACKAGE_HERE">
+
+3. android/app/src/debug/AndroidManifest.xml (if exists)
+   Line 1: <manifest xmlns:android="..." package="YOUR_PACKAGE_HERE">
+
+4. android/app/src/profile/AndroidManifest.xml (if exists)
+   Line 1: <manifest xmlns:android="..." package="YOUR_PACKAGE_HERE">
+
+────────────────────────────────────────────────────────────────────────────
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: VERIFY APP VERSION                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+File: D:\NEW_PROJECTS\Habitera\pubspec.yaml
+
+Current Version: 1.0.0+1
+                 │        │
+                 │        └─ Build Number (internal, increments for each build)
+                 └────────── User Version (shown to users)
+
+Current:  1.0.0+1
+Status:   ✓ OK for first release
+
+For future releases, increment BOTH numbers:
+  First release:   1.0.0+1   ← Current
+  Bug fix:         1.0.1+2   ← Next
+  Another bug fix: 1.0.2+3   ← After that
+  New feature:     1.1.0+4   ← Feature update
+  Major update:    2.0.0+5   ← Major redesign
+
+RULE: Both numbers MUST ALWAYS INCREASE. Never decrease build number.
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: PLAY STORE LISTING INFORMATION                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+You'll need these when uploading to Google Play Console:
+
+📱 APP NAME
+─────────────────────────────────────────────────────────────────────────────
+App Name (max 50 characters):  Habitera
+
+⚠️  Note: This cannot have keywords like "free", "app", numbers at start.
+
+
+📝 SHORT DESCRIPTION
+─────────────────────────────────────────────────────────────────────────────
+Short Description (max 80 characters):
+Build habits. Shape your life.
+
+
+📖 FULL DESCRIPTION
+─────────────────────────────────────────────────────────────────────────────
+Full Description (max 4000 characters):
+
+Habitera is your personal habit tracking companion.
+
+FEATURES:
+• Create and track daily habits
+• Monitor streaks and progress  
+• View analytics with heatmap calendar
+• Customizable reminders
+• No login required - all data stays private
+
+KEY BENEFITS:
+• Offline-first design - no internet needed
+• Full privacy control - your data is yours
+• Beautiful interface with light & dark themes
+• Simple, intuitive design
+• Built with Flutter for smooth performance
+
+PRIVACY:
+Your privacy is paramount. Habitera stores all data locally on your device.
+No accounts, no cloud storage, no tracking. You own your data completely.
+
+
+🎯 PRIVACY POLICY URL
+─────────────────────────────────────────────────────────────────────────────
+Privacy Policy URL (required): ___________________________________________
+
+If you don't have one, create using:
+  - https://app-privacy-policy-generator.com/
+  - https://www.freeprivacypolicy.com/
+  - Host on your website
+
+MUST include:
+  ✓ No personal data collection
+  ✓ Local storage only
+  ✓ No third-party services
+  ✓ No advertising
+
+
+🎨 APP STORE GRAPHICS NEEDED
+─────────────────────────────────────────────────────────────────────────────
+Before uploading to Play Store:
+
+1. APP ICON (512×512 pixels)
+   Location: assets/app_icon.png (or similar)
+   Format: PNG with alpha channel
+   Status: ___________________________________________
+
+2. FEATURE GRAPHIC (1024×500 pixels)
+   Shows at top of store listing
+   Format: PNG or JPEG
+   Status: ___________________________________________
+
+3. SCREENSHOTS (minimum 2, maximum 8 per device type)
+   Phones: 1080×1920 px (9:16 ratio)
+   Tablets: 1200×1920 px or 1600×2560 px
+   Status: ___________________________________________
+
+
+📋 CONTENT RATING QUESTIONNAIRE
+─────────────────────────────────────────────────────────────────────────────
+Category: Lifestyle / Health & Fitness / Personal Development
+Target Age: Mature 17+ (default for productivity apps)
+Status: ___________________________________________
+
+
+💰 PRICING & DISTRIBUTION
+─────────────────────────────────────────────────────────────────────────────
+Pricing Model: FREE
+Distribution Countries: All available (or select specific regions)
+Supported Devices: Phones and Tablets
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 6: GOOGLE PLAY DEVELOPER ACCOUNT                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📋 ACCOUNT SETUP
+─────────────────────────────────────────────────────────────────────────────
+Developer Account Email:     ___________________________________________
+Developer Account Status:    ___________________________________________
+One-time Fee Paid ($25):     ☐ Yes  ☐ No
+
+Note: You need a Google Play Developer account to upload apps.
+Register at: https://play.google.com/console
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 7: BUILD VERIFICATION BEFORE BUNDLING                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+PRE-BUILD CHECKLIST
+─────────────────────────────────────────────────────────────────────────────
+☐ Keystore created (habitera_release.jks in android/)
+☐ key.properties filled with credentials
+☐ Package name updated (all 4 files)
+☐ Version number verified in pubspec.yaml
+☐ Android SDK installed (API 21+)
+☐ Java JDK installed (11+)
+☐ Flutter pub get completed
+☐ No code errors (flutter analyze)
+☐ Tests pass (flutter test)
+☐ Tested on device/emulator
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 8: BUILD COMMANDS                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+CLEAN BUILD BEFORE BUNDLING
+─────────────────────────────────────────────────────────────────────────────
+cd D:\NEW_PROJECTS\Habitera
+
+flutter clean
+flutter pub get
+flutter analyze
+flutter test
+
+
+BUILD APP BUNDLE FOR PLAY STORE
+─────────────────────────────────────────────────────────────────────────────
+flutter build appbundle --release
+
+Expected Output:
+✓ BUILD SUCCESSFUL
+✓ File: build/app/outputs/bundle/release/app-release.aab
+✓ Size: ~20-25 MB
+✓ Status: Ready to upload
+
+
+OPTIONAL: BUILD APK FOR TESTING
+─────────────────────────────────────────────────────────────────────────────
+flutter build apk --split-per-abi --release
+
+Output: build/app/outputs/apk/release/
+  - app-armeabi-v7a-release.apk
+  - app-arm64-v8a-release.apk
+  - app-x86_64-release.apk
+
+
+================================================================================
+                        CONFIGURATION SUMMARY FORM
+================================================================================
+
+⚠️  FILL THIS OUT COMPLETELY BEFORE BUILDING
+
+KEYSTORE & SIGNING:
+─────────────────────────────────────────────────────────────────────────────
+Keystore Password:           ___________________________________________
+Key Password:                ___________________________________________
+Key Alias:                   habitera_release_key
+Keystore File:               habitera_release.jks
+Location:                    D:\NEW_PROJECTS\Habitera\android\
+Status:                      ☐ Created  ☐ Configured  ☐ Ready
+
+
+PACKAGE CONFIGURATION:
+─────────────────────────────────────────────────────────────────────────────
+Old Package Name:            com.example.habitera
+New Package Name:            ___________________________________________
+Updated in build.gradle:     ☐ Yes  ☐ No
+Updated in AndroidManifest:  ☐ Yes  ☐ No
+Status:                      ☐ Ready
+
+
+VERSION INFORMATION:
+─────────────────────────────────────────────────────────────────────────────
+App Version:                 1.0.0+1
+User Version:                1.0.0
+Build Number:                1
+Status:                      ☐ Verified  ☐ Ready
+
+
+APP STORE LISTING:
+─────────────────────────────────────────────────────────────────────────────
+App Name:                    Habitera
+Short Description:           Build habits. Shape your life.
+Full Description:            ___________________________________________
+Privacy Policy URL:          ___________________________________________
+Category:                    Lifestyle / Health & Fitness
+Target Age:                  Mature 17+
+Status:                      ☐ Ready
+
+
+GRAPHICS & SCREENSHOTS:
+─────────────────────────────────────────────────────────────────────────────
+App Icon (512×512):          ☐ Ready
+Feature Graphic (1024×500):  ☐ Ready
+Screenshots (2-8):           ☐ Ready
+Status:                      ☐ All prepared
+
+
+GOOGLE PLAY ACCOUNT:
+─────────────────────────────────────────────────────────────────────────────
+Developer Account:           ___________________________________________
+Email:                       ___________________________________________
+$25 Fee Paid:                ☐ Yes  ☐ No
+Status:                      ☐ Ready
+
+
+PRE-BUILD CHECKLIST:
+─────────────────────────────────────────────────────────────────────────────
+☐ All above information filled completely
+☐ Keystore created and configured
+☐ Package name updated
+☐ Version number correct
+☐ Code tested on device
+☐ Flutter clean completed
+☐ All errors fixed
+☐ Ready to build
+
+
+BUILD STATUS:
+─────────────────────────────────────────────────────────────────────────────
+Ready to Build:              ☐ Yes  (if all above ☑️)
+Date of Build:               ___________________________________________
+Build Output File:           build/app/outputs/bundle/release/app-release.aab
+File Size:                   ___________________________________________
+Status:                      ☐ Success  ☐ Failed
+
+
+================================================================================
+                            IMPORTANT REMINDERS
+================================================================================
+
+🔒 SECURITY:
+✓ Save keystore password securely
+✓ Backup keystore file to secure location
+✗ Never commit key.properties to GitHub
+✗ Never share keystore publicly
+✗ Never lose keystore (can't recreate!)
+
+📦 APP BUNDLE:
+✓ AAB format is required for Play Store
+✓ Cannot use old APK-only approach
+✓ Google Play handles optimization per device
+✓ Users download smaller, optimized APKs
+
+🔄 VERSION NUMBERS:
+✓ Always increment build number (last digit)
+✓ Always increment user version appropriately
+✗ Never decrease version numbers
+✗ Cannot reuse same version+build combination
+
+📱 FIRST RELEASE:
+✓ May take 1-24 hours for review
+✓ Start with Testing track if unsure
+✓ Move to Production after verification
+✓ More conservative content rating is safer
+
+🚀 SUBSEQUENT RELEASES:
+✓ Faster once app is approved
+✓ Usually 1-3 hours review time
+✓ Keep good documentation of changes
+✓ Respond to user reviews
+
+
+================================================================================
+                        TROUBLESHOOTING REFERENCE
+================================================================================
+
+ISSUE: "Gradle build failed"
+SOLUTION:
+  1. flutter clean
+  2. flutter pub get
+  3. Check Java version: java -version (should be 11+)
+  4. Check Android SDK: flutter doctor -v
+
+ISSUE: "Keystore not found"
+SOLUTION:
+  1. Verify habitera_release.jks exists in D:\NEW_PROJECTS\Habitera\android\
+  2. Check key.properties path is correct
+  3. Ensure file not hidden
+
+ISSUE: "Wrong password" during build
+SOLUTION:
+  1. Verify passwords in key.properties match keystore
+  2. Test with: keytool -list -v -keystore android/habitera_release.jks
+  3. Regenerate keystore if needed
+
+ISSUE: "Build errors"
+SOLUTION:
+  1. Run: flutter analyze
+  2. Run: flutter test
+  3. Fix all reported issues
+  4. Rebuild
+
+ISSUE: "Cannot upload to Play Store"
+SOLUTION:
+  1. Verify app.release.aab file exists
+  2. Check file size is ~20-25 MB
+  3. Ensure developer account is active
+  4. Check content rating completed
+
+
+================================================================================
+                          NEXT ACTION CHECKLIST
+================================================================================
+
+BEFORE YOU BUILD THE BUNDLE:
+
+☐ 1. Read this file completely
+☐ 2. Fill in all configuration details above
+☐ 3. Create keystore (Step 1)
+☐ 4. Configure key.properties (Step 2)
+☐ 5. Update package name (Step 3)
+☐ 6. Verify version number (Step 4)
+☐ 7. Prepare all graphics (screenshots, icon)
+☐ 8. Write store listing text
+☐ 9. Run pre-build checks
+☐ 10. Execute build commands (Step 8)
+
+AFTER SUCCESSFUL BUILD:
+
+☐ 11. Verify output file exists
+☐ 12. Check file size is reasonable
+☐ 13. Create app in Play Store Console
+☐ 14. Upload app-release.aab
+☐ 15. Add store listing information
+☐ 16. Submit for review
+
+AFTER APPROVAL:
+
+☐ 17. Verify app on Play Store
+☐ 18. Monitor crash reports
+☐ 19. Respond to user reviews
+☐ 20. Plan next update
+
+
+================================================================================
+                              CONTACT & HELP
+================================================================================
+
+Documentation Files:
+- START_HERE.md ..................... Quick start guide
+- BUILD_INSTRUCTIONS.md ............. Detailed instructions
+- PLAYSTORE_CHECKLIST.md ............ Release checklist
+- QUICK_BUILD.md .................... Fast reference
+- RELEASE_PIPELINE.md ............... Visual workflow
+
+External Resources:
+- Flutter Deployment: https://docs.flutter.dev/deployment/android
+- Google Play Console: https://play.google.com/console
+- Android Signing: https://developer.android.com/studio/publish/app-signing
+- App Policies: https://play.google.com/about/play-policies/
+
+
+================================================================================
+
+Generated: January 18, 2026
+Project: Habitera v1.0.0+1
+Status: Ready for Configuration
+
+Good luck with your release! 🚀
+
+================================================================================

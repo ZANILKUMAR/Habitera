@@ -2,7 +2,7 @@ name: habitera
 description: "Build habits. Shape your life. - Offline-first habit tracking app"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

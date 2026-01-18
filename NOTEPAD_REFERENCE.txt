@@ -1,0 +1,478 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    HABITERA - COMPLETE SETUP GUIDE                          ║
+║              All Settings, Configuration & Bundle Preparation               ║
+║                      Everything You Need Before Build                       ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+OPEN THIS FILE IN NOTEPAD FOR EASY REFERENCE!
+This is your complete guide to preparing Habitera for Play Store.
+
+
+════════════════════════════════════════════════════════════════════════════
+                            QUICK START (5 minutes)
+════════════════════════════════════════════════════════════════════════════
+
+👉 If you're in a hurry, follow these 3 steps:
+
+STEP 1: Create Keystore
+    cd D:\NEW_PROJECTS\Habitera\android
+    keytool -genkey -v -keystore habitera_release.jks `
+      -keyalg RSA -keysize 2048 -validity 10000 `
+      -alias habitera_release_key
+    
+    When asked for password, enter: ________________
+    When asked for key password, enter: ________________
+
+STEP 2: Fill Credentials
+    Edit: D:\NEW_PROJECTS\Habitera\android\key.properties
+    
+    storePassword=YOUR_PASSWORD_FROM_STEP_1
+    keyPassword=YOUR_PASSWORD_FROM_STEP_1
+    keyAlias=habitera_release_key
+    storeFile=habitera_release.jks
+
+STEP 3: Build
+    cd D:\NEW_PROJECTS\Habitera
+    flutter build appbundle --release
+
+✅ DONE! Your app bundle is ready at:
+    build/app/outputs/bundle/release/app-release.aab
+
+
+════════════════════════════════════════════════════════════════════════════
+                          DETAILED CONFIGURATION
+════════════════════════════════════════════════════════════════════════════
+
+
+1. KEYSTORE GENERATION
+────────────────────────────────────────────────────────────────────────────
+WHY: Signs your app so Google Play can verify it's really you
+
+DO THIS ONCE ONLY:
+    Location: D:\NEW_PROJECTS\Habitera\android\
+    Command: keytool -genkey -v -keystore habitera_release.jks `
+             -keyalg RSA -keysize 2048 -validity 10000 `
+             -alias habitera_release_key
+
+WHEN ASKED, ENTER:
+    What is your first and last name? 
+    ➜ Your Name
+    
+    What is your organizational unit?
+    ➜ Engineering / Development
+    
+    What is your organization?
+    ➜ Your Company Name
+    
+    What is your City or Locality?
+    ➜ Your City
+    
+    What is your State or Province?
+    ➜ Your State
+    
+    What is the two-letter country code for this unit?
+    ➜ US (or your country code)
+    
+    Is CN=Your Name, OU=Engineering, ... correct?
+    ➜ yes
+
+RESULT:
+    ✓ Creates file: habitera_release.jks
+    ✓ File location: D:\NEW_PROJECTS\Habitera\android\
+    ✓ File size: ~2-3 KB
+    ✓ Valid for: 10,000 days (~27 years)
+
+
+2. CONFIGURE SIGNING CREDENTIALS
+────────────────────────────────────────────────────────────────────────────
+FILE: D:\NEW_PROJECTS\Habitera\android\key.properties
+
+CURRENT (TEMPLATE):
+    storePassword=YOUR_STORE_PASSWORD
+    keyPassword=YOUR_KEY_PASSWORD
+    keyAlias=habitera_release_key
+    storeFile=habitera_release.jks
+
+CHANGE TO (with YOUR passwords):
+    storePassword=THE_PASSWORD_YOU_ENTERED_IN_KEYSTORE_STEP
+    keyPassword=THE_PASSWORD_YOU_ENTERED_IN_KEYSTORE_STEP
+    keyAlias=habitera_release_key
+    storeFile=habitera_release.jks
+
+⚠️ IMPORTANT:
+    • storePassword and keyPassword are what YOU entered
+    • If you entered same password twice, use it for both
+    • Do NOT add quotes
+    • Do NOT add spaces
+
+
+3. UPDATE APP PACKAGE NAME
+────────────────────────────────────────────────────────────────────────────
+WHAT: Change from default "com.example.habitera" to YOUR unique package name
+
+CHOOSE YOUR PACKAGE NAME:
+    Examples:
+    • com.mycompany.habitera
+    • com.myname.habitera
+    • io.github.username.habitera
+    • com.mydomain.habitera
+    
+    My choice: ___________________________________
+
+RULES:
+    ✓ Lowercase letters only
+    ✓ Use dots to separate parts
+    ✓ Must be UNIQUE
+    ✗ No uppercase letters
+    ✗ No spaces
+    ✗ No leading numbers
+    ✗ No special characters
+
+⚠️  CANNOT BE CHANGED AFTER FIRST RELEASE!
+
+UPDATE FILE 1: android/app/build.gradle.kts
+    Find line ~25:
+        applicationId = "com.example.habitera"
+    
+    Change to:
+        applicationId = "com.yourcompany.habitera"
+
+UPDATE FILE 2: android/app/src/main/AndroidManifest.xml
+    Find line 1:
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    Change to:
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.yourcompany.habitera">
+
+⚠️  USE SAME PACKAGE NAME IN BOTH FILES!
+
+
+4. APP VERSION INFORMATION
+────────────────────────────────────────────────────────────────────────────
+FILE: D:\NEW_PROJECTS\Habitera\pubspec.yaml
+
+CURRENT:
+    version: 1.0.0+1
+             │      │
+             │      └─ Build number (must increase each release)
+             └────── User version (shown to users)
+
+FIRST RELEASE: ✓ 1.0.0+1 (OK - no change needed)
+
+FUTURE RELEASES: Update both numbers
+    • Bug fix: 1.0.1+2
+    • Another bug fix: 1.0.2+3
+    • New feature: 1.1.0+4
+    • Major redesign: 2.0.0+5
+
+RULE: Both numbers MUST ALWAYS INCREASE
+
+
+5. APP DETAILS FOR PLAY STORE
+────────────────────────────────────────────────────────────────────────────
+App Name: Habitera
+Category: Lifestyle / Health & Fitness
+Minimum API: 21 (Android 5.0)
+Target API: 35 (Android 15)
+
+DESCRIPTION:
+    Short: Build habits. Shape your life.
+    
+    Full: Habitera is your personal habit tracking companion.
+          Create daily habits, track streaks, and monitor progress
+          with beautiful analytics. No login required - your data
+          stays completely private.
+
+FEATURES:
+    • Create and track daily habits
+    • Current and longest streak tracking
+    • Weekly & monthly summaries
+    • Offline-first (no internet required)
+    • Beautiful light & dark themes
+    • Customizable reminders
+    • Export/import data as JSON
+
+PRIVACY POLICY: ___________________________________
+    (required - use privacy policy generator if you don't have one)
+
+
+6. REQUIRED GRAPHICS & SCREENSHOTS
+────────────────────────────────────────────────────────────────────────────
+Before uploading to Play Store, prepare:
+
+App Icon: 512×512 pixels
+    Format: PNG with alpha
+    Status: ☐ Ready
+
+Feature Graphic: 1024×500 pixels
+    Shows at top of Play Store listing
+    Status: ☐ Ready
+
+Screenshots (minimum 2, maximum 8):
+    Phone: 1080×1920 px
+    Tablets: 1200×1920 or 1600×2560 px
+    Status: ☐ Ready
+
+
+════════════════════════════════════════════════════════════════════════════
+                        BUILD COMMAND SEQUENCE
+════════════════════════════════════════════════════════════════════════════
+
+OPEN POWERSHELL AND RUN THESE COMMANDS IN ORDER:
+
+Step 1 - Navigate to project directory:
+    cd D:\NEW_PROJECTS\Habitera
+
+Step 2 - Clean previous builds:
+    flutter clean
+
+Step 3 - Get latest dependencies:
+    flutter pub get
+
+Step 4 - Check for code errors:
+    flutter analyze
+
+Step 5 - Run tests:
+    flutter test
+
+Step 6 - Build app bundle:
+    flutter build appbundle --release
+
+⏳ WAIT 3-5 MINUTES FOR BUILD TO COMPLETE
+
+OUTPUT:
+    ✓ BUILD SUCCESSFUL
+    File: build/app/outputs/bundle/release/app-release.aab
+    Size: ~20-25 MB
+    Status: Ready to upload to Play Store
+
+
+════════════════════════════════════════════════════════════════════════════
+                          PRE-BUILD CHECKLIST
+════════════════════════════════════════════════════════════════════════════
+
+BEFORE YOU PRESS BUILD, VERIFY:
+
+☐ 1. Keystore created
+      File: D:\NEW_PROJECTS\Habitera\android\habitera_release.jks
+      Exists: ✓ Yes ☐ No
+
+☐ 2. key.properties filled
+      File: D:\NEW_PROJECTS\Habitera\android\key.properties
+      Filled: ✓ Yes ☐ No
+      
+☐ 3. Package name updated
+      File: android/app/build.gradle.kts
+      Changed: com.example.habitera → com.yourcompany.habitera
+      Status: ✓ Done ☐ Not done
+
+☐ 4. Package in manifest
+      File: android/app/src/main/AndroidManifest.xml
+      Added: package="com.yourcompany.habitera"
+      Status: ✓ Done ☐ Not done
+
+☐ 5. Version verified
+      File: pubspec.yaml
+      Value: 1.0.0+1 (or your chosen version)
+      Status: ✓ Correct ☐ Need to update
+
+☐ 6. Code quality
+      Command: flutter analyze
+      Result: 0 errors ✓ Yes ☐ No
+
+☐ 7. Dependencies updated
+      Command: flutter pub get
+      Status: ✓ Done ☐ Not done
+
+☐ 8. Everything backed up
+      Keystore backup: ✓ Yes ☐ No
+      Password saved: ✓ Yes ☐ No
+
+☐ 9. I have time
+      Available: 5-10 minutes ✓ Yes ☐ No
+
+☐ 10. I'm ready
+       Start build: ✓ Yes ☐ No
+
+
+════════════════════════════════════════════════════════════════════════════
+                     WHAT HAPPENS AFTER BUILD
+════════════════════════════════════════════════════════════════════════════
+
+IF BUILD SUCCESSFUL ✅
+
+Your app bundle is ready:
+    Location: build/app/outputs/bundle/release/app-release.aab
+    Size: ~20-25 MB
+    Format: Android App Bundle (AAB)
+
+NEXT STEPS:
+    1. Create app in Google Play Console
+    2. Upload app-release.aab
+    3. Add screenshots and description
+    4. Complete content rating questionnaire
+    5. Set pricing (Free)
+    6. Submit for review
+    7. Wait 1-3 hours for approval
+    8. Your app goes LIVE! 🎉
+
+
+IF BUILD FAILED ❌
+
+Check BUILD_INSTRUCTIONS.md for troubleshooting or:
+
+Error: "Keystore not found"
+    ✓ Check file exists: D:\NEW_PROJECTS\Habitera\android\habitera_release.jks
+    ✓ Verify key.properties path
+    
+Error: "Wrong password"
+    ✓ Check passwords in key.properties match keystore
+    ✓ Look for extra spaces
+    
+Error: "Gradle failed"
+    ✓ Run: flutter clean
+    ✓ Run: flutter pub get
+    ✓ Run: flutter build appbundle --release (again)
+
+
+════════════════════════════════════════════════════════════════════════════
+                            SECURITY REMINDERS
+════════════════════════════════════════════════════════════════════════════
+
+⚠️ PROTECT YOUR KEYSTORE:
+
+MUST DO:
+    ✓ Save keystore backup in secure location
+    ✓ Store password securely (password manager)
+    ✓ Never share keystore publicly
+    ✓ Never commit to GitHub or public repo
+
+NEVER DO:
+    ✗ Post keystore in Discord/Slack
+    ✗ Email keystore to anyone
+    ✗ Upload to cloud storage publicly
+    ✗ Include in version control
+    ✗ Share password casually
+
+IF LOST:
+    ⚠️  Cannot be recovered
+    ⚠️  Must use new package name for next app
+    ⚠️  Cannot update existing app
+
+
+════════════════════════════════════════════════════════════════════════════
+                        CONFIGURATION SUMMARY
+════════════════════════════════════════════════════════════════════════════
+
+Print or save this section for reference:
+
+MY PROJECT DETAILS
+────────────────────────────────────────────────────────────────────────────
+App Name:                    Habitera
+Package Name:                ___________________________________
+Version:                     1.0.0+1
+Min Android Version:         5.0 (API 21)
+Build Status:                ✓ Ready
+
+KEYSTORE INFORMATION
+────────────────────────────────────────────────────────────────────────────
+Keystore File:               habitera_release.jks
+Location:                    android/
+Key Alias:                   habitera_release_key
+Password:                    _________________________ (saved securely)
+Backup Location:             _________________________ (offline safe)
+
+FILE CHANGES MADE
+────────────────────────────────────────────────────────────────────────────
+key.properties:              ☑ Updated with passwords
+build.gradle.kts:            ☑ Package name updated
+AndroidManifest.xml:         ☑ Package attribute added
+pubspec.yaml:                ☑ Version verified
+
+PLAY STORE INFO
+────────────────────────────────────────────────────────────────────────────
+Privacy Policy URL:          ___________________________________
+Developer Account Email:     ___________________________________
+$25 Fee Status:              ☐ Paid  ☐ Not yet
+
+BUILD RESULT
+────────────────────────────────────────────────────────────────────────────
+Build Date:                  ___________________________________
+Build Status:                ☐ Success  ☐ Failed
+Output File Size:            ___________________________________
+Upload Status:               ☐ Uploaded  ☐ Not yet
+
+
+════════════════════════════════════════════════════════════════════════════
+                        DOCUMENTS IN THIS PACKAGE
+════════════════════════════════════════════════════════════════════════════
+
+TEXT/NOTEPAD FILES (Configuration):
+    • PRE_BUILD_CHECKLIST.txt ................ This file!
+    • APP_BUNDLE_SETTINGS.txt ............... Detailed settings guide
+    • ANDROID_BUILD_CONFIG.txt .............. File-by-file changes
+    • FINAL_SUMMARY.txt ..................... Setup complete summary
+
+MARKDOWN FILES (Documentation):
+    • START_HERE.md ......................... Quick start guide
+    • INDEX.md .............................. Master guide
+    • README_PLAYSTORE.md ................... Overview
+    • BUILD_INSTRUCTIONS.md ................. Detailed instructions
+    • PLAYSTORE_CHECKLIST.md ................ Release checklist
+    • QUICK_BUILD.md ........................ Fast reference
+    • RELEASE_PIPELINE.md ................... Visual workflow
+
+BUILD SCRIPTS:
+    • build_appbundle.bat ................... Windows automation
+    • build_appbundle.sh .................... Linux/Mac automation
+
+
+════════════════════════════════════════════════════════════════════════════
+                              QUICK REFERENCE
+════════════════════════════════════════════════════════════════════════════
+
+PASSWORDS & CREDENTIALS:
+    Keystore Password:  ________________________ (SAVE THIS!)
+    Key Password:       ________________________ (SAVE THIS!)
+    Developer Email:    ________________________
+
+PACKAGE NAME:
+    Chosen Package:     ________________________
+
+FILE LOCATIONS:
+    Key Properties:     android/key.properties
+    Keystore:           android/habitera_release.jks
+    Build Output:       build/app/outputs/bundle/release/app-release.aab
+    Build Script:       build_appbundle.bat (Windows)
+
+BUILD COMMAND:
+    flutter build appbundle --release
+
+
+════════════════════════════════════════════════════════════════════════════
+                            NEXT STEPS
+════════════════════════════════════════════════════════════════════════════
+
+1. FILL IN ALL BLANKS ABOVE ↑
+2. Follow the steps in order
+3. Create keystore
+4. Update configuration files
+5. Run build commands
+6. Upload to Play Store
+7. Monitor approval (1-3 hours)
+8. LAUNCH! 🚀
+
+
+════════════════════════════════════════════════════════════════════════════
+
+Version: 1.0.0+1
+Project: Habitera
+Date: January 18, 2026
+
+STATUS: ✅ READY FOR SETUP
+
+PRINT THIS FILE - YOU'LL NEED IT!
+
+════════════════════════════════════════════════════════════════════════════
