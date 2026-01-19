@@ -1,4 +1,4 @@
-package com.example.habitera
+package com.habitera.app
 
 import io.flutter.embedding.android.FlutterActivity
 
