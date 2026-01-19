@@ -91,7 +91,6 @@ class NotificationService {
   /// Request all required permissions and return status
   Future<Map<String, bool>> requestPermissions() async {
     bool notificationGranted = false;
-    bool exactAlarmGranted = false;
     
     // Request iOS permissions
     final iosResult = await _flutterLocalNotificationsPlugin
@@ -113,20 +112,14 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin>();
     
     if (androidImplementation != null) {
-      // Request notification permission
+      // Request notification permission only (no exact alarm - uses inexact scheduling)
       final granted = await androidImplementation.requestNotificationsPermission();
       notificationGranted = granted ?? false;
       debugPrint('Notification permission granted: $notificationGranted');
-      
-      // Request exact alarm permission
-      final exactGranted = await androidImplementation.requestExactAlarmsPermission();
-      exactAlarmGranted = exactGranted ?? false;
-      debugPrint('Exact alarm permission granted: $exactAlarmGranted');
     }
     
     return {
       'notifications': notificationGranted,
-      'exactAlarms': exactAlarmGranted,
     };
   }
 
@@ -197,7 +190,7 @@ class NotificationService {
             presentSound: true,
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
@@ -312,7 +305,7 @@ class NotificationService {
             presentSound: true,
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
@@ -402,7 +395,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

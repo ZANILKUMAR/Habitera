@@ -12,7 +12,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize timezone data
-  tz.initializeTimeZones();
+  try {
+    tz.initializeTimeZones();
+  } catch (e) {
+    debugPrint('Timezone initialization failed: $e');
+  }
   
   // Set local timezone
   try {
@@ -21,7 +25,11 @@ void main() async {
   } catch (e) {
     debugPrint('Timezone setup failed: $e');
     // Fallback to a default timezone
-    tz.setLocalLocation(tz.getLocation('America/New_York'));
+    try {
+      tz.setLocalLocation(tz.getLocation('America/New_York'));
+    } catch (_) {
+      // Ignore if fallback also fails
+    }
   }
   
   // Initialize notifications (wrapped in try-catch to prevent crash)
